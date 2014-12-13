@@ -1,0 +1,197 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>clintrials.phase2 &mdash; clintrials 0.1.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="clintrials 0.1.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for clintrials.phase2</h1><div class="highlight"><pre>
+<span class="n">__author__</span> <span class="o">=</span> <span class="s">&#39;Kristian Brock&#39;</span>
+<span class="n">__contact__</span> <span class="o">=</span> <span class="s">&#39;kristian.brock@gmail.com&#39;</span>
+
+<span class="sd">&quot;&quot;&quot; Implementations of simple phase II clinical trial designs. Long, complicated designs belong in own modules. &quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">beta</span><span class="p">,</span> <span class="n">binom</span><span class="p">,</span> <span class="n">chi2</span>
+
+
+<div class="viewcode-block" id="bayesian_2stage_dich_design"><a class="viewcode-back" href="../../index.html#clintrials.phase2.bayesian_2stage_dich_design">[docs]</a><span class="k">def</span> <span class="nf">bayesian_2stage_dich_design</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">p0</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">N0</span><span class="p">,</span> <span class="n">N1</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">prior_a</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">prior_b</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;StopAtInterim&#39;</span><span class="p">,</span> <span class="s">&#39;StopAtFinal&#39;</span><span class="p">,</span> <span class="s">&#39;GoAtFinal&#39;</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot; Calculate the outcome probabilities for a two-stage Bayesian trial of a dichotomous variable.</span>
+
+<span class="sd">    We test the hypotheses H0: theta&lt;p0 vs H1: theta&gt;p1, stopping at interim if Prob(theta &lt; p0 | data) &gt; p,</span>
+<span class="sd">     stopping at final analysis if Prob(theta &lt; p0 | data) &gt; q, otherwise concluding that theta &gt; p1.</span>
+
+<span class="sd">    .. note:: this is Prof Lucinda Billingham&#39;s dichotomous design used in the National Lung Matrix trial.</span>
+
+<span class="sd">    :param theta: the true efficacy</span>
+<span class="sd">    :type theta: float</span>
+<span class="sd">    :param p0: hypothesised lower bound probability</span>
+<span class="sd">    :type p0: float</span>
+<span class="sd">    :param p1: hypothesised upper bound probability</span>
+<span class="sd">    :type p1: float</span>
+<span class="sd">    :param N0: number of participants at interim stage</span>
+<span class="sd">    :type N0: int</span>
+<span class="sd">    :param N1: number of participants at final stage</span>
+<span class="sd">    :type N1: int</span>
+<span class="sd">    :param p: certainty needed to reject H0 at end of interim stage</span>
+<span class="sd">    :type p: float</span>
+<span class="sd">    :param q: certainty needed to accept H1 at end of final stage</span>
+<span class="sd">    :type q: float</span>
+<span class="sd">    :param prior_a: first parameter to Beta distribution to describe prior beliefs about theta</span>
+<span class="sd">    :type prior_a: float</span>
+<span class="sd">    :param prior_b: scond parameter to Beta distribution to describe prior beliefs about theta</span>
+<span class="sd">    :type prior_b: float</span>
+<span class="sd">    :param labels: labels for the cases of stopping at interim, stopping at final, and approving at final analysis.</span>
+<span class="sd">    :type labels: list</span>
+<span class="sd">    :return: dict, mapping outcome label to probability</span>
+<span class="sd">    :rtype: dict</span>
+
+<span class="sd">    e.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; res = bayesian_2stage_dich_design(0.35, 0.2, 0.4, 15, 30, 0.8, 0.6)</span>
+<span class="sd">    &gt;&gt;&gt; res == {&#39;GoAtFinal&#39;: 0.19396008516693783, &#39;StopAtFinal&#39;: 0.79186113024100546,</span>
+<span class="sd">    ...         &#39;StopAtInterim&#39;: 0.014178784592056664}</span>
+<span class="sd">    True</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">prior_a</span><span class="p">,</span> <span class="n">prior_b</span>
+    <span class="n">n0</span><span class="p">,</span> <span class="n">n1</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">product</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">N0</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="n">N1</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
+    <span class="n">n0</span><span class="p">,</span> <span class="n">n1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n0</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n1</span><span class="p">)</span>
+    <span class="n">lik0</span> <span class="o">=</span> <span class="n">binom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">n0</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">N0</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">lik1</span> <span class="o">=</span> <span class="n">binom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">N1</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">joint_lik</span> <span class="o">=</span> <span class="n">lik0</span> <span class="o">*</span> <span class="n">lik1</span>
+    <span class="n">prob_lt_p0</span> <span class="o">=</span> <span class="n">beta</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">p0</span><span class="p">,</span> <span class="n">a</span><span class="o">+</span><span class="n">n0</span><span class="p">,</span> <span class="n">b</span><span class="o">+</span><span class="n">N0</span><span class="o">-</span><span class="n">n0</span><span class="p">)</span>
+    <span class="n">prob_gt_p1</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">beta</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">p1</span><span class="p">,</span> <span class="n">a</span><span class="o">+</span><span class="n">n0</span><span class="o">+</span><span class="n">n1</span><span class="p">,</span> <span class="n">b</span><span class="o">+</span><span class="n">N0</span><span class="o">+</span><span class="n">N1</span><span class="o">-</span><span class="n">n0</span><span class="o">-</span><span class="n">n1</span><span class="p">)</span>
+    <span class="n">stop_0</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">joint_lik</span><span class="p">[</span><span class="n">prob_lt_p0</span> <span class="o">&gt;</span> <span class="n">p</span><span class="p">])</span>
+    <span class="n">go_1</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">joint_lik</span><span class="p">[</span><span class="n">prob_gt_p1</span> <span class="o">&gt;</span> <span class="n">q</span><span class="p">])</span>
+    <span class="n">stop_1</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">stop_0</span> <span class="o">-</span> <span class="n">go_1</span>
+    <span class="k">return</span> <span class="p">{</span> <span class="n">labels</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">stop_0</span><span class="p">,</span> <span class="n">labels</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">stop_1</span><span class="p">,</span> <span class="n">labels</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span> <span class="n">go_1</span><span class="p">}</span>
+
+</div>
+<div class="viewcode-block" id="chisqu_two_arm_comparison"><a class="viewcode-back" href="../../index.html#clintrials.phase2.chisqu_two_arm_comparison">[docs]</a><span class="k">def</span> <span class="nf">chisqu_two_arm_comparison</span><span class="p">(</span><span class="n">p0</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">alpha</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Test that p1 exceeds p0 with n patients per arm using the chi-squared distribution.</span>
+
+<span class="sd">    :param p0: first proportion</span>
+<span class="sd">    :type p0: float</span>
+<span class="sd">    :param p1: second proportion</span>
+<span class="sd">    :type p1: float</span>
+<span class="sd">    :param n: n patients per arm</span>
+<span class="sd">    :type n: int</span>
+<span class="sd">    :param alpha: significance</span>
+<span class="sd">    :type alpha: float</span>
+<span class="sd">    :param to_pandas: True to get results as pandas.DataFrame else dict</span>
+<span class="sd">    :type to_pandas: bool</span>
+<span class="sd">    :return: tuple -- (probability of rejecting, probability of not-rejecting)</span>
+
+<span class="sd">    E.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; chisqu_two_arm_comparison(0.3, 0.5, 20, 0.05)</span>
+<span class="sd">    (0.34534530091794574, 0.65465469908205098)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">n0</span><span class="p">,</span> <span class="n">n1</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="nb">list</span><span class="p">(</span><span class="n">product</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))))</span>
+    <span class="n">n0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n0</span><span class="p">)</span>
+    <span class="n">n1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n1</span><span class="p">)</span>
+    <span class="n">lik0</span> <span class="o">=</span> <span class="n">binom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">n0</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">p0</span><span class="p">)</span>
+    <span class="n">lik1</span> <span class="o">=</span> <span class="n">binom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">p1</span><span class="p">)</span>
+    <span class="n">lik</span> <span class="o">=</span> <span class="n">lik0</span> <span class="o">*</span> <span class="n">lik1</span>
+    <span class="n">observed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">n0</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">n0</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">n1</span><span class="p">])</span>
+    <span class="n">success</span> <span class="o">=</span> <span class="n">n0</span> <span class="o">+</span> <span class="n">n1</span>
+    <span class="n">fail</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">n</span> <span class="o">-</span> <span class="n">n0</span> <span class="o">-</span> <span class="n">n1</span>
+    <span class="n">expected</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">success</span><span class="o">/</span><span class="mf">2.</span><span class="p">,</span> <span class="n">fail</span><span class="o">/</span><span class="mf">2.</span><span class="p">,</span> <span class="n">success</span><span class="o">/</span><span class="mf">2.</span><span class="p">,</span> <span class="n">fail</span><span class="o">/</span><span class="mf">2.</span><span class="p">])</span>
+    <span class="n">test_stat</span> <span class="o">=</span> <span class="p">((</span><span class="n">observed</span><span class="o">-</span><span class="n">expected</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">expected</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="mi">1</span><span class="o">-</span><span class="n">chi2</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">test_stat</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">reject</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span> <span class="o">&lt;</span> <span class="n">alpha</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">n0</span><span class="o">&lt;</span><span class="n">n1</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">n0</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">lik</span><span class="p">,</span> <span class="n">test_stat</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">reject</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">]</span> <span class="o">==</span> <span class="bp">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">]),</span> <span class="nb">sum</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">]</span> <span class="o">==</span> <span class="bp">False</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2014, Kristian Brock.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

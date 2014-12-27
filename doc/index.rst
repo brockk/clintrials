@@ -6,13 +6,59 @@
 Welcome to clintrials's documentation!
 ======================================
 
-Contents:
+Contents: BLAH
 
 .. toctree::
    :maxdepth: 2
 
 
-Phase 2
+Common, helpful stuff
+======================
+
+
+General functions
+__________________
+
+.. automodule:: clintrials.common
+    :members: inverse_logit
+
+dfcrm-style link functions and their inverses
+______________________________________________
+
+See http://cran.r-project.org/web/packages/dfcrm/dfcrm.pdf
+
+.. automodule:: clintrials.common
+    :members: empiric, inverse_empiric, logistic, inverse_logistic, hyperbolic_tan, inverse_hyperbolic_tan
+
+Coll
+____
+
+.. automodule:: clintrials.coll
+    :members:
+
+
+Recruitment
+____________
+.. automodule:: clintrials.recruitment
+    :members: RecruitmentStream, ConstantRecruitmentStream, QuadrilateralRecruitmentStream
+
+
+
+Phase I Trials
+===================
+Dose-finding based on toxicity
+_______________________________
+
+These designs are used to find the maximum tolerable dose (MTD) for cytotoxic agents.
+
+
+Dose-finding based on efficacy and toxicity
+____________________________________________
+
+These designs are used to find the optimum biological dose (OBD) for cytotoxic and cytostatic agents.
+
+
+Phase II Trials
 ===================
 
 .. automodule:: clintrials.phase2

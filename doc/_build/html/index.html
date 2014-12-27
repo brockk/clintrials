@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
@@ -15,7 +13,7 @@
     
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    '',
+        URL_ROOT:    './',
         VERSION:     '0.1.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -49,14 +47,363 @@
             
   <div class="section" id="welcome-to-clintrials-s-documentation">
 <h1>Welcome to clintrials&#8217;s documentation!<a class="headerlink" href="#welcome-to-clintrials-s-documentation" title="Permalink to this headline">¶</a></h1>
-<p>Contents:</p>
+<p>Contents: BLAH</p>
 <div class="toctree-wrapper compound">
 <ul class="simple">
 </ul>
 </div>
 </div>
+<div class="section" id="common-helpful-stuff">
+<h1>Common, helpful stuff<a class="headerlink" href="#common-helpful-stuff" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-clintrials.common">
+<span id="general-functions"></span><h2>General functions<a class="headerlink" href="#module-clintrials.common" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="clintrials.common.inverse_logit">
+<tt class="descclassname">clintrials.common.</tt><tt class="descname">inverse_logit</tt><big>(</big><em>x</em><big>)</big><a class="reference internal" href="_modules/clintrials/common.html#inverse_logit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.common.inverse_logit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the inverse logit function value:</p>
+<p><span class="math">\(\frac{e^x}{e^x+1}\)</span>,
+or equivalently, <span class="math">\(\frac{1}{1 + e^{-x}}\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>x</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; x-variable</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Inverse logit function value.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">inverse_logit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="go">0.5</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="dfcrm-style-link-functions-and-their-inverses">
+<h2>dfcrm-style link functions and their inverses<a class="headerlink" href="#dfcrm-style-link-functions-and-their-inverses" title="Permalink to this headline">¶</a></h2>
+<p>See <a class="reference external" href="http://cran.r-project.org/web/packages/dfcrm/dfcrm.pdf">http://cran.r-project.org/web/packages/dfcrm/dfcrm.pdf</a></p>
+<span class="target" id="module-clintrials.common"></span><dl class="function">
+<dt id="clintrials.common.empiric">
+<tt class="descclassname">clintrials.common.</tt><tt class="descname">empiric</tt><big>(</big><em>x</em>, <em>a0=None</em>, <em>beta=0</em><big>)</big><a class="reference internal" href="_modules/clintrials/common.html#empiric"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.common.empiric" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the empiric function value:</p>
+<p><span class="math">\(x^{e^\beta}\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; x-variable</li>
+<li><strong>a0</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; intercept parameter. This param is ignored here but exists to match similar call signatures.</li>
+<li><strong>beta</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; slope parameter</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Empiric function value</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">math</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">empiric</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="go">0.25</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.common.inverse_empiric">
+<tt class="descclassname">clintrials.common.</tt><tt class="descname">inverse_empiric</tt><big>(</big><em>x</em>, <em>a0=0</em>, <em>beta=0</em><big>)</big><a class="reference internal" href="_modules/clintrials/common.html#inverse_empiric"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.common.inverse_empiric" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the inverse empiric function value:</p>
+<p><span class="math">\(x^{e^{-\beta}}\)</span></p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this function is the inverse of <a class="reference internal" href="#clintrials.common.empiric" title="clintrials.common.empiric"><tt class="xref py py-func docutils literal"><span class="pre">clintrials.common.empiric()</span></tt></a>.</p>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; x-variable</li>
+<li><strong>a0</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; intercept parameter. This param is ignored here but exists to match similar call signatures.</li>
+<li><strong>beta</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; slope parameter</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Inverse empiric function value</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">math</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inverse_empiric</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="go">0.5</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.common.logistic">
+<tt class="descclassname">clintrials.common.</tt><tt class="descname">logistic</tt><big>(</big><em>x</em>, <em>a0=0</em>, <em>beta=0</em><big>)</big><a class="reference internal" href="_modules/clintrials/common.html#logistic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.common.logistic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the logistic function value:</p>
+<p><span class="math">\(\frac{1}{1 + e^{-a_0 - e^\beta x}}\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; x-variable</li>
+<li><strong>a0</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; intercept parameter.</li>
+<li><strong>beta</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; slope parameter</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Logistic function value</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">logistic</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="go">0.42057106852688747</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.common.inverse_logistic">
+<tt class="descclassname">clintrials.common.</tt><tt class="descname">inverse_logistic</tt><big>(</big><em>x</em>, <em>a0=0</em>, <em>beta=0</em><big>)</big><a class="reference internal" href="_modules/clintrials/common.html#inverse_logistic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.common.inverse_logistic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the inverse logistic function value:</p>
+<p><span class="math">\(\frac{\log(\frac{x}{1-x}) - a_0}{e^\beta}\)</span></p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this function is the inverse of <a class="reference internal" href="#clintrials.common.logistic" title="clintrials.common.logistic"><tt class="xref py py-func docutils literal"><span class="pre">clintrials.common.logistic()</span></tt></a>.</p>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; x-variable</li>
+<li><strong>a0</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; intercept parameter.</li>
+<li><strong>beta</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; slope parameter</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Inverse logistic function value</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">round</span><span class="p">(</span><span class="n">inverse_logistic</span><span class="p">(</span><span class="mf">0.42057106852688747</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+<span class="go">0.25</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="module-clintrials.coll">
+<span id="coll"></span><h2>Coll<a class="headerlink" href="#module-clintrials.coll" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="clintrials.coll.to_1d_list">
+<tt class="descclassname">clintrials.coll.</tt><tt class="descname">to_1d_list</tt><big>(</big><em>x</em><big>)</big><a class="reference internal" href="_modules/clintrials/coll.html#to_1d_list"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.coll.to_1d_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reshape scalars, lists and lists of lists of arbitrary depth as a single flat list, i.e. list of depth 1.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this function basically offloads all its work to a generator function because <strong>we like yield</strong>!</p>
+</div>
+<p>E.g.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">to_1d_list</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="go">[0]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">to_1d_list</span><span class="p">([</span><span class="mi">1</span><span class="p">])</span>
+<span class="go">[1]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">to_1d_list</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],</span><span class="mi">3</span><span class="p">,[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">]])</span>
+<span class="go">[1, 2, 3, 4, 5]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">to_1d_list</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],</span><span class="mi">3</span><span class="p">,[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,[</span><span class="mi">6</span><span class="p">,[</span><span class="mi">7</span><span class="p">,</span><span class="mi">8</span><span class="p">,[</span><span class="mi">9</span><span class="p">]]]]])</span>
+<span class="go">[1, 2, 3, 4, 5, 6, 7, 8, 9]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.coll.to_1d_list_gen">
+<tt class="descclassname">clintrials.coll.</tt><tt class="descname">to_1d_list_gen</tt><big>(</big><em>x</em><big>)</big><a class="reference internal" href="_modules/clintrials/coll.html#to_1d_list_gen"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.coll.to_1d_list_gen" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generator function to reduce lists of lists of arbitrary depth (and scalars) to single depth-1 list.</p>
+<p>Note: this function is recursive.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-clintrials.recruitment">
+<span id="recruitment"></span><h2>Recruitment<a class="headerlink" href="#module-clintrials.recruitment" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="clintrials.recruitment.ConstantRecruitmentStream">
+<em class="property">class </em><tt class="descclassname">clintrials.recruitment.</tt><tt class="descname">ConstantRecruitmentStream</tt><big>(</big><em>intrapatient_gap</em><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#ConstantRecruitmentStream"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.ConstantRecruitmentStream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recruitment stream where the intrapatient wait is constant.</p>
+<p>This is the simplest recruitment stream case. A patient arrives every delta units of time.</p>
+<p>E.g.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">ConstantRecruitmentStream</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">2.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">5.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">7.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">2.5</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="clintrials.recruitment.ConstantRecruitmentStream.next">
+<tt class="descname">next</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#ConstantRecruitmentStream.next"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.ConstantRecruitmentStream.next" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the time that the next patient is recruited.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The time that the next patient is recruited.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.recruitment.ConstantRecruitmentStream.reset">
+<tt class="descname">reset</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#ConstantRecruitmentStream.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.ConstantRecruitmentStream.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset the recruitment stream to start anew.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">None</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">None</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="clintrials.recruitment.QuadrilateralRecruitmentStream">
+<em class="property">class </em><tt class="descclassname">clintrials.recruitment.</tt><tt class="descname">QuadrilateralRecruitmentStream</tt><big>(</big><em>intrapatient_gap</em>, <em>initial_intensity</em>, <em>vertices</em>, <em>interpolate=True</em><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#QuadrilateralRecruitmentStream"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.QuadrilateralRecruitmentStream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recruitment stream that allows recruitment potential to vary as a function of time using vertices.
+Between two vertices, recruitment potential is represented by areas of quadrilaterals. Recruitment potential
+may change linearly using interpolation, or instantananeously using steps. In the former case, the quadrilaterals
+are trapeziums; in the latter, rectangles.</p>
+<p>I started by calling this class DampenedRecruitmentStream because recruitment typically opens at something
+like 50% potency where half recruitment centres are open and then increases linearly to 100% after about a year.
+However, I settled on the name QuadrilateralRecruitmentStream because of the important role quadrilaterals play in
+calculating the cumulative recruitment mass between two times.</p>
+<p>Let&#8217;s do an example. Imagine a hypothetical trial that will recruit using several recruitment centres. When all
+recruitment centres are open, the trial expects to recruit a patient every four days, thus the intrapatient gap
+is 4.0. The trial will open with initial recruitment potential of 50% (i.e. half of the recruiting sites are open).
+Recruitment potential is expected to reach 100% after 20 days, linearly increasing from 50% to 100% over the first
+20 days, i.e. recruitment centres will be continually opened at a constant rate. The first patient will be recruited
+at time t where t satisfies the integral equation</p>
+<p><span class="math">\(\int_0^t 0.5 + \frac{1.0 - 0.5}{20 - 0}s  ds = \int_0^t 0.5 + \frac{s}{40} ds
+= \frac{t}{2} + \frac{t^2}{80}\)</span></p>
+<p>i.e. solving the quadratic</p>
+<p><span class="math">\(t = \frac{-\frac{1}{2} + \sqrt{\frac{1}{2}^2 - 4 \times \frac{1}{80} \times -4}}{\frac{2}{80}}
+= 6.83282\)</span></p>
+<p>, and so on.</p>
+<p>E.g.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span> <span class="o">=</span> <span class="n">QuadrilateralRecruitmentStream</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="p">[(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span> <span class="n">interpolate</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">6.8328157299974768</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">12.2490309931942</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">16.878177829171548</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">21.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">25.0</span>
+</pre></div>
+</div>
+<p>Now, let&#8217;s consider the same scenario again, with stepped transition rather than interpolated transition. In this
+scenario, a patient is recruited after each 4 / 0.5 = 8 days for times from 0 to 20 when recruitment potential is
+at 50%. After time=20, a patient is recruited after every 4 days because recruitment potential is at 100%. For the
+patient that straddles the time t=20, the time to recruit is 4 days at 50% potential plus 2 days at 100% = 4 days,
+as required.</p>
+<p>E.g.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">s2</span> <span class="o">=</span> <span class="n">QuadrilateralRecruitmentStream</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="p">[(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span> <span class="n">interpolate</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s2</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">8.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s2</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">16.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s2</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">22.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s2</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+<span class="go">26.0</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="clintrials.recruitment.QuadrilateralRecruitmentStream.next">
+<tt class="descname">next</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#QuadrilateralRecruitmentStream.next"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.QuadrilateralRecruitmentStream.next" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the time that the next patient is recruited.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The time that the next patient is recruited.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.recruitment.QuadrilateralRecruitmentStream.reset">
+<tt class="descname">reset</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/recruitment.html#QuadrilateralRecruitmentStream.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.recruitment.QuadrilateralRecruitmentStream.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset the recruitment stream to start anew.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">None</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">None</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="phase-i-trials">
+<h1>Phase I Trials<a class="headerlink" href="#phase-i-trials" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="dose-finding-based-on-toxicity">
+<h2>Dose-finding based on toxicity<a class="headerlink" href="#dose-finding-based-on-toxicity" title="Permalink to this headline">¶</a></h2>
+<p>These designs are used to find the maximum tolerable dose (MTD) for cytotoxic agents.</p>
+</div>
+<div class="section" id="dose-finding-based-on-efficacy-and-toxicity">
+<h2>Dose-finding based on efficacy and toxicity<a class="headerlink" href="#dose-finding-based-on-efficacy-and-toxicity" title="Permalink to this headline">¶</a></h2>
+<p>These designs are used to find the optimum biological dose (OBD) for cytotoxic and cytostatic agents.</p>
+</div>
+</div>
 <div class="section" id="module-clintrials.phase2">
-<span id="phase-2"></span><h1>Phase 2<a class="headerlink" href="#module-clintrials.phase2" title="Permalink to this headline">¶</a></h1>
+<span id="phase-ii-trials"></span><h1>Phase II Trials<a class="headerlink" href="#module-clintrials.phase2" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
 <dt id="clintrials.phase2.bayesian_2stage_dich_design">
 <tt class="descclassname">clintrials.phase2.</tt><tt class="descname">bayesian_2stage_dich_design</tt><big>(</big><em>theta, p0, p1, N0, N1, p, q, prior_a=1, prior_b=1, labels=['StopAtInterim', 'StopAtFinal', 'GoAtFinal']</em><big>)</big><a class="reference internal" href="_modules/clintrials/phase2.html#bayesian_2stage_dich_design"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.phase2.bayesian_2stage_dich_design" title="Permalink to this definition">¶</a></dt>
@@ -151,10 +498,20 @@
         <div class="sphinxsidebarwrapper">
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
-<li><a class="reference internal" href="#">Welcome to clintrials&#8217;s documentation!</a><ul>
+<li><a class="reference internal" href="#">Welcome to clintrials&#8217;s documentation!</a></li>
+<li><a class="reference internal" href="#common-helpful-stuff">Common, helpful stuff</a><ul>
+<li><a class="reference internal" href="#module-clintrials.common">General functions</a></li>
+<li><a class="reference internal" href="#dfcrm-style-link-functions-and-their-inverses">dfcrm-style link functions and their inverses</a></li>
+<li><a class="reference internal" href="#module-clintrials.coll">Coll</a></li>
+<li><a class="reference internal" href="#module-clintrials.recruitment">Recruitment</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-clintrials.phase2">Phase 2</a></li>
+<li><a class="reference internal" href="#phase-i-trials">Phase I Trials</a><ul>
+<li><a class="reference internal" href="#dose-finding-based-on-toxicity">Dose-finding based on toxicity</a></li>
+<li><a class="reference internal" href="#dose-finding-based-on-efficacy-and-toxicity">Dose-finding based on efficacy and toxicity</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-clintrials.phase2">Phase II Trials</a></li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 
@@ -194,7 +551,7 @@
     </div>
     <div class="footer">
         &copy; Copyright 2014, Kristian Brock.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.3.
     </div>
   </body>
 </html>

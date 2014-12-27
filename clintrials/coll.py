@@ -2,7 +2,7 @@ __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
 
-""" Methods pertaining to collections. """
+""" Helpful methods pertaining to collections. """
 
 
 def to_1d_list_gen(x):

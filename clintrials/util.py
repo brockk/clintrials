@@ -17,15 +17,31 @@ from coll import to_1d_list_gen, to_1d_list
 
 
 def fullname(o):
-    """
+    """ Get the fully-qualified class name of an object
+
     :param o: object of any kind
+    :type o: object
     :return: fully-qualified class name
+    :rtype: string
+
     """
+
     return o.__module__ + "." + o.__class__.__name__
 
 
 def atomic_to_json(obj):
-    """ Wrapper to ensure the smallest object is in a JSON-friendly form. """
+    """ Wrapper to ensure the smallest object is in a JSON-friendly form.
+
+    .. note:: This function exists because numpy types raise errors when you try to JSON save them. Don't believe me?
+                Try ``json.dumps(np.int(1))`` and get something about 1 not being serializable.
+
+    :param obj: Object to convert to JSON-able form
+    :type obj: object
+    :return: obj, or its scalar equivalent if obj is a numpy generic type
+    :rtype: object
+
+    """
+
     if isinstance(obj, np.generic):
         return np.asscalar(obj)
     else:
@@ -33,7 +49,14 @@ def atomic_to_json(obj):
 
 
 def iterable_to_json(obj):
-    """ Returns a list of JSON-friendly representations of the objects in a collection. """
+    """ Returns a list of JSON-friendly representations of the objects in a collection.
+
+    :param obj: JSON-ise each element of this collection
+    :type obj: iterable
+    :return: congruent list of JSON-able objects
+    :rtype: list
+
+    """
     if isinstance(obj, Iterable):
         return [atomic_to_json(x) for x in obj]
     else:
@@ -41,10 +64,14 @@ def iterable_to_json(obj):
 
 
 def row_to_json(row, **kwargs):
-    """ Turn a pandas DataFrame row or Series to a JSON object
+    """ Turn a pandas.Series to a JSON object
 
-    Params:
-    encoding, to specify encoding of source when using json.loads().
+    :param row: a row to turn to JSON-able dict
+    :type row: pandas.Series
+    :param kwargs: map of keyword args to pass to json.loads
+    :type kwargs: dict
+    :return: a JSON-friendly dict representation of row
+    :rtype: dict
 
     """
 
@@ -64,9 +91,23 @@ def row_to_json(row, **kwargs):
 
 def df_to_json(df, do_value_counts=True, definitely_do_value_counts=False,
                do_column_summaries=True, do_row_summaries=True):
-    """ Serialize a pandas DataFrame to an object that may be written as JSON.
+    """ Serialize a pandas.DataFrame to an object that may be written as JSON.
 
-    Note: DataFrame's provide their own JSON serialization method but I don't like it.
+    .. note:: pandas.DataFrame provides its own JSON serialization method but I don't like it.
+
+    :param df: DataFrame to serialise to JSON-able form.
+    :type df: pandas.DataFrame
+    :param do_value_counts: True to calculate value counts for each column
+    :type do_value_counts: bool
+    :param definitely_do_value_counts: If there is no aggregation possible (i.e. all elements are unique), aggregation
+                                        will be suppressed. Use True to override this suppression.
+    :type definitely_do_value_counts: bool
+    :param do_column_summaries: True to calculate summary statistics for each column
+    :type do_column_summaries: bool
+    :param do_row_summaries: True to calculate summary statistics for each row
+    :type do_row_summaries: bool
+    :return: A JSON-able representation of df
+    :rtype: dict
 
     """
 
@@ -131,7 +172,18 @@ def df_to_json(df, do_value_counts=True, definitely_do_value_counts=False,
 
 
 def levenshtein(s1, s2):
-    """ How 'far' is string s1 from s2? """
+    """ How 'far' is string s1 from s2? Calculate the Levenshtein distance between two strings.
+
+    See http://en.wikipedia.org/wiki/Levenshtein_distance
+
+    :param s1: first string
+    :type s1: string
+    :param s2: second string
+    :type s2: string
+    :return: the Levenshtein distance
+    :rtype: int
+
+    """
     if len(s1) < len(s2):
         return levenshtein(s2, s1)
 
@@ -154,7 +206,19 @@ def levenshtein(s1, s2):
 
 
 def levenshtein_index(s1, s2):
-    """ Returns similarity score between 0 and 1by rebasing levenshtein score """
+    """ Returns similarity score for strings s1 and s2 between 0 and 1 by dividing levenshtein score by greatest length.
+
+    This method uses :func:`clintrials.util.levenshtein`.
+
+    :param s1: first string
+    :type s1: string
+    :param s2: second string
+    :type s2: string
+    :return: Similarity index between 0 and 1
+    :rtype: float
+
+    """
+
     l = levenshtein(s1, s2)
     max_length = max(len(s1), len(s2))
     if max_length:
@@ -216,8 +280,7 @@ def correlated_binary_outcomes(num_pairs, u, psi, seed=None):
     Note: The Bonett article at
     http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf
     details Yule's method (1912) for estimating correlation from odds ratio and vice-versa.
-    If the two proportions in u are close,
-        r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+    If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
         OR = ((1+r) / (1-r))**2
     provide decent approximations.
 

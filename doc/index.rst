@@ -42,6 +42,10 @@ ____________
 .. automodule:: clintrials.recruitment
     :members: RecruitmentStream, ConstantRecruitmentStream, QuadrilateralRecruitmentStream
 
+Util
+_____
+.. automodule:: clintrials.util
+    :members:
 
 
 Phase I Trials

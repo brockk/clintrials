@@ -390,6 +390,291 @@ as required.</p>
 </dd></dl>
 
 </div>
+<div class="section" id="module-clintrials.util">
+<span id="util"></span><h2>Util<a class="headerlink" href="#module-clintrials.util" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="clintrials.util.Memoize">
+<em class="property">class </em><tt class="descclassname">clintrials.util.</tt><tt class="descname">Memoize</tt><big>(</big><em>f</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#Memoize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.Memoize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to transparently cache function results by their runtime args</p>
+<p>E.g.
+&gt;&gt;&gt; f = lambda x: x**3
+&gt;&gt;&gt; f = Memoize(f)
+&gt;&gt;&gt; f(2.0) # Result is calculated and cached
+8.0
+&gt;&gt;&gt; f(2.0) # Result is fetched from cache
+8.0</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="clintrials.util.ParameterSpace">
+<em class="property">class </em><tt class="descclassname">clintrials.util.</tt><tt class="descname">ParameterSpace</tt><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to handle combinations of parameters (i.e. a parameter space) in simulations.</p>
+<dl class="method">
+<dt id="clintrials.util.ParameterSpace.add">
+<tt class="descname">add</tt><big>(</big><em>label</em>, <em>values</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.add"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add a variable and a list of all values the variable may take.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.util.ParameterSpace.sample">
+<tt class="descname">sample</tt><big>(</big><em>label</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.sample"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Randomly fetch a value for variable with label.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.util.ParameterSpace.sample_all">
+<tt class="descname">sample_all</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.sample_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.sample_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Randomly fetch one value for each variable, returned as a map from label to value.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.atomic_to_json">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">atomic_to_json</tt><big>(</big><em>obj</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#atomic_to_json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.atomic_to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper to ensure the smallest object is in a JSON-friendly form.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This function exists because numpy types raise errors when you try to JSON save them. Don&#8217;t believe me?
+Try <tt class="docutils literal"><span class="pre">json.dumps(np.int(1))</span></tt> and get something about 1 not being serializable.</p>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>obj</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#object" title="(in Python v2.7)"><em>object</em></a>) &#8211; Object to convert to JSON-able form</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">obj, or its scalar equivalent if obj is a numpy generic type</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">object</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.correlated_binary_outcomes">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">correlated_binary_outcomes</tt><big>(</big><em>num_pairs</em>, <em>u</em>, <em>psi</em>, <em>seed=None</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#correlated_binary_outcomes"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.correlated_binary_outcomes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Randomly sample correlated binary digits, copying the method from R-package ranBin2.</p>
+<p>Params:
+num_pairs, number of pairs
+u, 2-item list/tuple of event probabilities
+psi, odds ratio of the binary outcomes
+seed, optional seed for reproducible randomness</p>
+<p>Note: The Bonett article at
+<a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
+details Yule&#8217;s method (1912) for estimating correlation from odds ratio and vice-versa.
+If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and</p>
+<blockquote>
+<div>OR = ((1+r) / (1-r))**2</div></blockquote>
+<p>provide decent approximations.</p>
+<p>Returns:
+num_pairs * 2 numpy array, paired observations in rows.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.correlated_binary_outcomes_from_uniforms">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">correlated_binary_outcomes_from_uniforms</tt><big>(</big><em>unifs</em>, <em>u</em>, <em>psi</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#correlated_binary_outcomes_from_uniforms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.correlated_binary_outcomes_from_uniforms" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create correlated binary outcomes from observed n*3 array of uniforms, tweaking method from R-package ranBin2.</p>
+<p>Params:
+unifs, array of shape (n, 3) of uniforms between 0 and 1
+u, 2-item list/tuple of event probabilities
+psi, odds ratio of the binary outcomes</p>
+<p>Note: The Bonett article at
+<a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
+details Yule&#8217;s method (1912) for estimating correlation from odds ratio and vice-versa.
+If the two proportions in u are close,</p>
+<blockquote>
+<div>r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+OR = ((1+r) / (1-r))**2</div></blockquote>
+<p>provide decent approximations.</p>
+<p>Returns:
+n * 2 numpy array, paired observations in rows, where n is num rows in unifs</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.cross_tab">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">cross_tab</tt><big>(</big><em>col_row_pairs</em>, <em>cols=None</em>, <em>rows=None</em>, <em>to_json=False</em>, <em>do_value_counts=False</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#cross_tab"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.cross_tab" title="Permalink to this definition">¶</a></dt>
+<dd><p>Cross-tabulate counts of data pairs.</p>
+<p>Params:
+col_row_pairs, list of 2-tuples, (col item, row item), e.g. [(&#8216;1&#8217;, &#8216;Related&#8217;), (&#8216;2&#8217;, &#8216;Unrelated&#8217;), (&#8216;2&#8217;, &#8216;Related&#8217;)]
+cols, list of col-headers. Distinct items will be used if omitted.
+rows, list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.
+to_json, True to return JSON-able object; False to get a Pandas DataFrame</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.df_to_json">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">df_to_json</tt><big>(</big><em>df</em>, <em>do_value_counts=True</em>, <em>definitely_do_value_counts=False</em>, <em>do_column_summaries=True</em>, <em>do_row_summaries=True</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#df_to_json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.df_to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Serialize a pandas.DataFrame to an object that may be written as JSON.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">pandas.DataFrame provides its own JSON serialization method but I don&#8217;t like it.</p>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>df</strong> (<em>pandas.DataFrame</em>) &#8211; DataFrame to serialise to JSON-able form.</li>
+<li><strong>do_value_counts</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to calculate value counts for each column</li>
+<li><strong>definitely_do_value_counts</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If there is no aggregation possible (i.e. all elements are unique), aggregation
+will be suppressed. Use True to override this suppression.</li>
+<li><strong>do_column_summaries</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to calculate summary statistics for each column</li>
+<li><strong>do_row_summaries</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to calculate summary statistics for each row</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">A JSON-able representation of df</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.fullname">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">fullname</tt><big>(</big><em>o</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#fullname"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.fullname" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the fully-qualified class name of an object</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>o</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#object" title="(in Python v2.7)"><em>object</em></a>) &#8211; object of any kind</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">fully-qualified class name</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.get_proportion_confint_report">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">get_proportion_confint_report</tt><big>(</big><em>num_successes</em>, <em>num_trials</em>, <em>alpha=0.05</em>, <em>do_normal=True</em>, <em>do_agresti_coull=True</em>, <em>do_beta=False</em>, <em>do_wilson=True</em>, <em>do_jeffrey=False</em>, <em>do_binom_test=False</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#get_proportion_confint_report"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.get_proportion_confint_report" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get confidence intervals of proportion num_successes / num_trials using different methods in JSON-friendly form.</p>
+<p>Params:
+num_successes &amp; num_trials, you seek confidence interval(s) of the proportion with mean = num_successes / num_trials
+alpha, is significance used in statistical inferences
+do_XYZ, turn off and on various methods of estimating the confidence interval.</p>
+<blockquote>
+<div>Why do I use normal, agresti_coull and wilson by default?
+1) Normal, because it is the widely-used but flawed option.
+2) AgrestiCoull &amp; Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper
+&#8220;Interval Estimation for a Binomial Proportion&#8221; say:
+&#8216;we recommend the Wilson interval for small n and the interval suggested in Agresti and Coull for larger n&#8217;</div></blockquote>
+<p>Call to proportion_confint allows methods:
+- <cite>normal</cite> : asymptotic normal approximation
+- <cite>agresti_coull</cite> : Agresti-Coull interval
+- <cite>beta</cite> : Clopper-Pearson interval based on Beta distribution
+- <cite>wilson</cite> : Wilson Score interval
+- <cite>jeffrey</cite> : Jeffrey&#8217;s Bayesian Interval
+- <cite>binom_test</cite></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.iterable_to_json">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">iterable_to_json</tt><big>(</big><em>obj</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#iterable_to_json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.iterable_to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of JSON-friendly representations of the objects in a collection.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>obj</strong> (<em>iterable</em>) &#8211; JSON-ise each element of this collection</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">congruent list of JSON-able objects</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.levenshtein">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">levenshtein</tt><big>(</big><em>s1</em>, <em>s2</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#levenshtein"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.levenshtein" title="Permalink to this definition">¶</a></dt>
+<dd><p>How &#8216;far&#8217; is string s1 from s2? Calculate the Levenshtein distance between two strings.</p>
+<p>See <a class="reference external" href="http://en.wikipedia.org/wiki/Levenshtein_distance">http://en.wikipedia.org/wiki/Levenshtein_distance</a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>s1</strong> (<a class="reference external" href="http://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; first string</li>
+<li><strong>s2</strong> (<a class="reference external" href="http://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; second string</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">the Levenshtein distance</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">int</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.levenshtein_index">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">levenshtein_index</tt><big>(</big><em>s1</em>, <em>s2</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#levenshtein_index"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.levenshtein_index" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns similarity score for strings s1 and s2 between 0 and 1 by dividing levenshtein score by greatest length.</p>
+<p>This method uses <a class="reference internal" href="#clintrials.util.levenshtein" title="clintrials.util.levenshtein"><tt class="xref py py-func docutils literal"><span class="pre">clintrials.util.levenshtein()</span></tt></a>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>s1</strong> (<a class="reference external" href="http://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; first string</li>
+<li><strong>s2</strong> (<a class="reference external" href="http://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; second string</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Similarity index between 0 and 1</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.row_to_json">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">row_to_json</tt><big>(</big><em>row</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#row_to_json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.row_to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Turn a pandas.Series to a JSON object</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>row</strong> (<em>pandas.Series</em>) &#8211; a row to turn to JSON-able dict</li>
+<li><strong>kwargs</strong> (<a class="reference external" href="http://docs.python.org/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; map of keyword args to pass to json.loads</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">a JSON-friendly dict representation of row</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.util.support_match">
+<tt class="descclassname">clintrials.util.</tt><tt class="descname">support_match</tt><big>(</big><em>a</em>, <em>b</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#support_match"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.support_match" title="Permalink to this definition">¶</a></dt>
+<dd><p>Percentage score showing % of elements of a in b and b in a.</p>
+</dd></dl>
+
+</div>
 </div>
 <div class="section" id="phase-i-trials">
 <h1>Phase I Trials<a class="headerlink" href="#phase-i-trials" title="Permalink to this headline">¶</a></h1>
@@ -504,6 +789,7 @@ as required.</p>
 <li><a class="reference internal" href="#dfcrm-style-link-functions-and-their-inverses">dfcrm-style link functions and their inverses</a></li>
 <li><a class="reference internal" href="#module-clintrials.coll">Coll</a></li>
 <li><a class="reference internal" href="#module-clintrials.recruitment">Recruitment</a></li>
+<li><a class="reference internal" href="#module-clintrials.util">Util</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#phase-i-trials">Phase I Trials</a><ul>

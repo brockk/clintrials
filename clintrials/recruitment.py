@@ -222,23 +222,19 @@ class QuadrilateralRecruitmentStream(RecruitmentStream):
         for t1 in t:
             avail_mass = self.available_mass[t1]
             t0, _, y0, y1 = self.shapes[t1]
-            # print 'Using shape between', (t0,t1), 'and seeking', sought_mass, ',', avail_mass, 'is avail'
             if avail_mass >= sought_mass:
                 if self.interpolate:
                     y_at_cursor = self._linearly_interpolate_y(self.cursor, t0, t1, y0, y1)
                     new_cursor = self._invert(self.cursor, t1, y_at_cursor, y1, sought_mass)
-                    # print 'Set cursor to', new_cursor, 'after interpolation'
                     self.cursor = new_cursor
                 else:
                     y_at_cursor = y0
                     new_cursor = self._invert(self.cursor, t1, y_at_cursor, y1, sought_mass, as_rectangle=True)
-                    # print 'Set cursor to', new_cursor, 'after rectangulation'
                     self.cursor = new_cursor
 
                 self.available_mass[t1] -= sought_mass
-                # print 'After shuffling along, cursor is at', self.cursor
                 return self.cursor
-            else: #if avail_mass > 0:
+            else:
                 sought_mass -= avail_mass
                 self.available_mass[t1] = 0.0
                 if t1 > self.cursor:
@@ -271,7 +267,6 @@ class QuadrilateralRecruitmentStream(RecruitmentStream):
             return np.nan
         elif (y0 == y1 and y0 > 0) or as_rectangle:
             # We require area of a rectangle; easy!
-            # print 'Seeking', mass, 'at', y0, 'yields', t0, 'plus', 1.0 * mass / y0, 'equals', t0 + 1.0 * mass / y0
             return t0 + 1.0 * mass / y0
         else:
             # We require area of a trapezium. That requires solving a quadratic.

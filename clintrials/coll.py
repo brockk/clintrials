@@ -1,14 +1,13 @@
 __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
-
-""" Helpful methods pertaining to collections. """
+""" Functions and classes for manipulating collections. """
 
 
 def to_1d_list_gen(x):
     """ Generator function to reduce lists of lists of arbitrary depth (and scalars) to single depth-1 list.
 
-    Note: this function is recursive.
+    .. note:: this function is recursive.
 
     """
 

@@ -107,14 +107,14 @@ class QuadrilateralRecruitmentStream(RecruitmentStream):
     at time t where t satisfies the integral equation
 
     :math:`\\int_0^t 0.5 + \\frac{1.0 - 0.5}{20 - 0}s  ds = \\int_0^t 0.5 + \\frac{s}{40} ds
-    = \\frac{t}{2} + \\frac{t^2}{80}`
+    = \\frac{t}{2} + \\frac{t^2}{80} = 4`
 
     i.e. solving the quadratic
 
     :math:`t = \\frac{-\\frac{1}{2} + \\sqrt{\\frac{1}{2}^2 - 4 \\times \\frac{1}{80} \\times -4}}{\\frac{2}{80}}
     = 6.83282`
 
-    , and so on.
+    , and so on. The root of the quadratic yielded by :math:`-b - \\sqrt{b^2-4ac}` is ignored because it makes no sense.
 
     E.g.
 

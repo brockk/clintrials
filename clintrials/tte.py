@@ -11,36 +11,63 @@ from clintrials.util import atomic_to_json, iterable_to_json
 
 
 class BayesianTimeToEvent():
-    """ An object-oriented attempt at a simple adaptive Bayesian design for time-to-event endpoint using a model assuming
-    exponentially distributed event times and inverse-gamma specified prior beliefs on median survival time.
+    """ An object-oriented implementation of a simple adaptive Bayesian design for time-to-event endpoints using a
+    model assuming exponentially distributed event times and inverse-gamma prior beliefs on median survival time.
 
-    See Thall, P.F., Wooten, L.H., & Tannir, N.M. (2005) - Monitoring Event Times in Early Phase Clinical Trials:
-                                                            Some Practical Issues
+    .. note:: See Thall, P.F., Wooten, L.H., & Tannir, N.M. (2005) - *Monitoring Event Times in Early Phase Clinical
+                Trials: Some Practical Issues* for full information.
 
-    This class satisfies the interface for an adaptive time-to-event trial in the crctu package, i.e. it supports methods:
-    event_times()
-    recruitment_times()
-    update(cases)
-    test(time, **kwargs):
+    This class satisfies the interface for a time-to-event trial in the clintrials package, i.e. it supports methods:
+
+    - event_times()
+    - recruitment_times()
+    - update(cases)
+    - test(time, kwargs)
 
     """
 
     def __init__(self, alpha_prior, beta_prior):
+        """ Create an instance.
+
+        :param alpha_prior: first parameter in beta distribution for prior beliefs on median time-to-event
+        :type alpha_prior: float
+        :param beta_prior: second parameter in beta distribution for prior beliefs on median time-to-event
+        :type beta_prior: float
+
+        """
+
         self.alpha_prior = alpha_prior
         self.beta_prior = beta_prior
         self._times_to_event = []
         self._recruitment_times = []
 
     def event_times(self):
+        """ Get list of the times at which events occurred.
+
+        :return: list of event times in the order they were provided
+        :rtype: list
+
+        """
+
         return self._times_to_event
 
     def recruitment_times(self):
+        """ Get list of the times at which patients were recruited.
+
+        :return: list of recruitment times in the order they were provided
+        :rtype: list
+
+        """
+
         return self._recruitment_times
 
     def update(self, cases):
-        """
-        Params:
-        cases, list of 2-tuples, (event_time, recruitment_time)
+        """ Update the trial with new patient cases.
+
+        :param cases: list of cases expressed as 2-tuples, (event_time, recruitment_time)
+        :type cases: list
+        :return: Nothing
+        :rtype: None
 
         """
 
@@ -49,7 +76,20 @@ class BayesianTimeToEvent():
             self._recruitment_times.append(recruitment_time)
 
     def test(self, time, cutoff, probability, less_than=True):
-        """TODO """
+        """ Test posterior belief that median time-to-event parameter is less than or greater than some boundary value.
+
+        :param time: test at this time
+        :type time: float
+        :param cutoff: test median time against this critical value
+        :type cutoff: float
+        :param probability: require at least this degree of posterior certainty to declare significance
+        :type probability: float
+        :param less_than: True, to test parameter is less than cut-off, a-posteriori. False to test greater than
+        :type less_than: bool
+        :return: JSON-able dict object reporting test output
+        :rtype: dict
+
+        """
 
         event_time = np.array(self._times_to_event)
         recruit_time = np.array(self._recruitment_times)
@@ -93,22 +133,11 @@ def thall_bayesian_time_to_event_sim(n_simulations, n_patients, true_median, alp
                                      final_analysis_time_delta, recruitment_stream):
     """ Simulate instances of Thall, Wooten & Tannir's simple Bayesian design for trials of event times.
 
-    See Thall, P.F., Wooten, L.H., & Tannir, N.M. (2005) - Monitoring Event Times in Early Phase Clinical Trials:
-                                                            Some Practical Issues
+    .. deprecated:: 0.1
+        Use :class:`BayesianTimeToEvent` instead.
 
-    Params:
-    n_simulations and n_patients are pretty obvious
-    true_median, TODO
-    alpha_prior, TODO
-    beta_prior, TODO
-    lower_cutoff, TODO
-    upper_cutoff, TODO
-    interim_certainty, TODO
-    final_certainty, TODO
-    interim_analysis_after_patients, TODO
-    interim_analysis_time_delta, TODO
-    final_analysis_time_delta, TODO
-    recruitment_stream, instance of class like recruitment.ConstantRecruitmentStream that provides time of next recruit
+    .. note:: See Thall, P.F., Wooten, L.H., & Tannir, N.M. (2005) - *Monitoring Event Times in Early Phase Clinical
+            Trials: Some Practical Issues* for full information.
 
     """
 

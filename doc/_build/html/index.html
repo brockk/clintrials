@@ -243,7 +243,10 @@ or equivalently, <span class="math">\(\frac{1}{1 + e^{-x}}\)</span></p>
 <dt id="clintrials.coll.to_1d_list_gen">
 <tt class="descclassname">clintrials.coll.</tt><tt class="descname">to_1d_list_gen</tt><big>(</big><em>x</em><big>)</big><a class="reference internal" href="_modules/clintrials/coll.html#to_1d_list_gen"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.coll.to_1d_list_gen" title="Permalink to this definition">¶</a></dt>
 <dd><p>Generator function to reduce lists of lists of arbitrary depth (and scalars) to single depth-1 list.</p>
-<p>Note: this function is recursive.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this function is recursive.</p>
+</div>
 </dd></dl>
 
 </div>
@@ -319,11 +322,11 @@ Recruitment potential is expected to reach 100% after 20 days, linearly increasi
 20 days, i.e. recruitment centres will be continually opened at a constant rate. The first patient will be recruited
 at time t where t satisfies the integral equation</p>
 <p><span class="math">\(\int_0^t 0.5 + \frac{1.0 - 0.5}{20 - 0}s  ds = \int_0^t 0.5 + \frac{s}{40} ds
-= \frac{t}{2} + \frac{t^2}{80}\)</span></p>
+= \frac{t}{2} + \frac{t^2}{80} = 4\)</span></p>
 <p>i.e. solving the quadratic</p>
 <p><span class="math">\(t = \frac{-\frac{1}{2} + \sqrt{\frac{1}{2}^2 - 4 \times \frac{1}{80} \times -4}}{\frac{2}{80}}
 = 6.83282\)</span></p>
-<p>, and so on.</p>
+<p>, and so on. The root of the quadratic yielded by <span class="math">\(-b - \sqrt{b^2-4ac}\)</span> is ignored because it makes no sense.</p>
 <p>E.g.</p>
 <div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span> <span class="o">=</span> <span class="n">QuadrilateralRecruitmentStream</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="p">[(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span> <span class="n">interpolate</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">s1</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
@@ -396,13 +399,15 @@ as required.</p>
 <dt id="clintrials.util.Memoize">
 <em class="property">class </em><tt class="descclassname">clintrials.util.</tt><tt class="descname">Memoize</tt><big>(</big><em>f</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#Memoize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.Memoize" title="Permalink to this definition">¶</a></dt>
 <dd><p>Class to transparently cache function results by their runtime args</p>
-<p>E.g.
-&gt;&gt;&gt; f = lambda x: x**3
-&gt;&gt;&gt; f = Memoize(f)
-&gt;&gt;&gt; f(2.0) # Result is calculated and cached
-8.0
-&gt;&gt;&gt; f(2.0) # Result is fetched from cache
-8.0</p>
+<p>E.g.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">f</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">**</span><span class="mi">3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f</span> <span class="o">=</span> <span class="n">Memoize</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span> <span class="c"># Result is calculated and cached</span>
+<span class="go">8.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span> <span class="c"># Result is fetched from cache</span>
+<span class="go">8.0</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="class">
@@ -413,18 +418,86 @@ as required.</p>
 <dt id="clintrials.util.ParameterSpace.add">
 <tt class="descname">add</tt><big>(</big><em>label</em>, <em>values</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.add"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.add" title="Permalink to this definition">¶</a></dt>
 <dd><p>Add a variable and a list of all values the variable may take.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>label</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; variable label or name</li>
+<li><strong>values</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; list of values that variable may take</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.util.ParameterSpace.get_cyclical_iterator">
+<tt class="descname">get_cyclical_iterator</tt><big>(</big><em>limit=-1</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.get_cyclical_iterator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.get_cyclical_iterator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get iterator to <strong>deterministically</strong> cycle the possible parameter perumtations, optionally forever.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>limit</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; -1 to iterate cyclically forever, else maximum number of elements to iterate through.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">an iterable object</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">iterable</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.util.ParameterSpace.keys">
+<tt class="descname">keys</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.keys"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.keys" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get parameter space keys, i.e. the variable names</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">Collection of keys</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">iterable</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
 <dt id="clintrials.util.ParameterSpace.sample">
 <tt class="descname">sample</tt><big>(</big><em>label</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.sample"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.sample" title="Permalink to this definition">¶</a></dt>
 <dd><p>Randomly fetch a value for variable with label.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>label</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; variable label or name</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">randomly-sampled value</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">object</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
 <dt id="clintrials.util.ParameterSpace.sample_all">
 <tt class="descname">sample_all</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#ParameterSpace.sample_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.ParameterSpace.sample_all" title="Permalink to this definition">¶</a></dt>
-<dd><p>Randomly fetch one value for each variable, returned as a map from label to value.</p>
+<dd><p>Randomly sample a value for each variable, returned as a map from label to value.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">a randomly sampled set of parameter values</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">dict</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </dd></dl>
@@ -456,51 +529,95 @@ Try <tt class="docutils literal"><span class="pre">json.dumps(np.int(1))</span><
 <dt id="clintrials.util.correlated_binary_outcomes">
 <tt class="descclassname">clintrials.util.</tt><tt class="descname">correlated_binary_outcomes</tt><big>(</big><em>num_pairs</em>, <em>u</em>, <em>psi</em>, <em>seed=None</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#correlated_binary_outcomes"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.correlated_binary_outcomes" title="Permalink to this definition">¶</a></dt>
 <dd><p>Randomly sample correlated binary digits, copying the method from R-package ranBin2.</p>
-<p>Params:
-num_pairs, number of pairs
-u, 2-item list/tuple of event probabilities
-psi, odds ratio of the binary outcomes
-seed, optional seed for reproducible randomness</p>
-<p>Note: The Bonett article at
-<a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>num_pairs</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; number of pairs</li>
+<li><strong>u</strong> (<em>list or tuple</em>) &#8211; 2-item list/tuple of event probabilities</li>
+<li><strong>psi</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; odds ratio of the binary outcomes</li>
+<li><strong>seed</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; optional seed for reproducible randomness</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">ndarray of paired binary digits, 2 columns and num_pairs rows</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">numpy.ndarray</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The Bonett article at <a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
 details Yule&#8217;s method (1912) for estimating correlation from odds ratio and vice-versa.
-If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and</p>
-<blockquote>
-<div>OR = ((1+r) / (1-r))**2</div></blockquote>
-<p>provide decent approximations.</p>
-<p>Returns:
-num_pairs * 2 numpy array, paired observations in rows.</p>
+If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+OR = ((1+r) / (1-r))**2
+provide decent approximations.</p>
+</div>
 </dd></dl>
 
 <dl class="function">
 <dt id="clintrials.util.correlated_binary_outcomes_from_uniforms">
 <tt class="descclassname">clintrials.util.</tt><tt class="descname">correlated_binary_outcomes_from_uniforms</tt><big>(</big><em>unifs</em>, <em>u</em>, <em>psi</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#correlated_binary_outcomes_from_uniforms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.correlated_binary_outcomes_from_uniforms" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create correlated binary outcomes from observed n*3 array of uniforms, tweaking method from R-package ranBin2.</p>
-<p>Params:
-unifs, array of shape (n, 3) of uniforms between 0 and 1
-u, 2-item list/tuple of event probabilities
-psi, odds ratio of the binary outcomes</p>
-<p>Note: The Bonett article at
-<a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>unifs</strong> (<em>numpy.ndarray</em>) &#8211; array of shape (n, 3) of uniforms between 0 and 1</li>
+<li><strong>u</strong> (<em>list or tuple</em>) &#8211; 2-item list/tuple of event probabilities</li>
+<li><strong>psi</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; odds ratio of the binary outcomes</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">ndarray of paired binary digits, 2 columns and num_pairs rows</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">numpy.ndarray</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The Bonett article at <a class="reference external" href="http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf">http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</a>
 details Yule&#8217;s method (1912) for estimating correlation from odds ratio and vice-versa.
-If the two proportions in u are close,</p>
-<blockquote>
-<div>r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
-OR = ((1+r) / (1-r))**2</div></blockquote>
-<p>provide decent approximations.</p>
-<p>Returns:
-n * 2 numpy array, paired observations in rows, where n is num rows in unifs</p>
+If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+OR = ((1+r) / (1-r))**2
+provide decent approximations.</p>
+</div>
 </dd></dl>
 
 <dl class="function">
 <dt id="clintrials.util.cross_tab">
 <tt class="descclassname">clintrials.util.</tt><tt class="descname">cross_tab</tt><big>(</big><em>col_row_pairs</em>, <em>cols=None</em>, <em>rows=None</em>, <em>to_json=False</em>, <em>do_value_counts=False</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#cross_tab"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.cross_tab" title="Permalink to this definition">¶</a></dt>
 <dd><p>Cross-tabulate counts of data pairs.</p>
-<p>Params:
-col_row_pairs, list of 2-tuples, (col item, row item), e.g. [(&#8216;1&#8217;, &#8216;Related&#8217;), (&#8216;2&#8217;, &#8216;Unrelated&#8217;), (&#8216;2&#8217;, &#8216;Related&#8217;)]
-cols, list of col-headers. Distinct items will be used if omitted.
-rows, list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.
-to_json, True to return JSON-able object; False to get a Pandas DataFrame</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>col_row_pairs</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; list of 2-tuples, (col item, row item), e.g.
+[(&#8216;1&#8217;, &#8216;Related&#8217;), (&#8216;2&#8217;, &#8216;Unrelated&#8217;), (&#8216;2&#8217;, &#8216;Related&#8217;)]</li>
+<li><strong>cols</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; list of col-headers. Distinct items will be used if omitted.</li>
+<li><strong>rows</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.</li>
+<li><strong>to_json</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to return JSON-able object; False to get a pandas.DataFrame</li>
+<li><strong>do_value_counts</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to return value counts</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">pivottable-style cross tabulation</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict of pandas.DataFrame</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
@@ -557,23 +674,52 @@ will be suppressed. Use True to override this suppression.</li>
 <dt id="clintrials.util.get_proportion_confint_report">
 <tt class="descclassname">clintrials.util.</tt><tt class="descname">get_proportion_confint_report</tt><big>(</big><em>num_successes</em>, <em>num_trials</em>, <em>alpha=0.05</em>, <em>do_normal=True</em>, <em>do_agresti_coull=True</em>, <em>do_beta=False</em>, <em>do_wilson=True</em>, <em>do_jeffrey=False</em>, <em>do_binom_test=False</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#get_proportion_confint_report"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.get_proportion_confint_report" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get confidence intervals of proportion num_successes / num_trials using different methods in JSON-friendly form.</p>
-<p>Params:
-num_successes &amp; num_trials, you seek confidence interval(s) of the proportion with mean = num_successes / num_trials
-alpha, is significance used in statistical inferences
-do_XYZ, turn off and on various methods of estimating the confidence interval.</p>
-<blockquote>
-<div>Why do I use normal, agresti_coull and wilson by default?
-1) Normal, because it is the widely-used but flawed option.
-2) AgrestiCoull &amp; Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper
-&#8220;Interval Estimation for a Binomial Proportion&#8221; say:
-&#8216;we recommend the Wilson interval for small n and the interval suggested in Agresti and Coull for larger n&#8217;</div></blockquote>
-<p>Call to proportion_confint allows methods:
-- <cite>normal</cite> : asymptotic normal approximation
-- <cite>agresti_coull</cite> : Agresti-Coull interval
-- <cite>beta</cite> : Clopper-Pearson interval based on Beta distribution
-- <cite>wilson</cite> : Wilson Score interval
-- <cite>jeffrey</cite> : Jeffrey&#8217;s Bayesian Interval
-- <cite>binom_test</cite></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>num_successes</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; number of successes</li>
+<li><strong>num_trials</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; number of trials or attempts</li>
+<li><strong>alpha</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; significance used in statistical inferences</li>
+<li><strong>do_normal</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the normal approximation method</li>
+<li><strong>do_agresti_coull</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the Agresti-Coull method</li>
+<li><strong>do_beta</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the beta method</li>
+<li><strong>do_wilson</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the Wilson method</li>
+<li><strong>do_jeffrey</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the Jeffrey method</li>
+<li><strong>do_binom_test</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True to get a confidence interval using the binomial test method</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">JSON-able dict report</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Why do I use normal, agresti_coull and wilson by default?</p>
+<ol class="arabic">
+<li><p class="first">Normal, because it is the widely-used but flawed option.</p>
+</li>
+<li><dl class="first docutils">
+<dt>AgrestiCoull &amp; Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper</dt>
+<dd><p class="first last"><cite>Interval Estimation for a Binomial Proportion</cite> say &#8216;we recommend the Wilson interval for small n and the
+interval suggested in Agresti and Coull for larger n&#8217;</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Call to proportion_confint allows methods:</p>
+<ul class="simple">
+<li><cite>normal</cite> : asymptotic normal approximation</li>
+<li><cite>agresti_coull</cite> : Agresti-Coull interval</li>
+<li><cite>beta</cite> : Clopper-Pearson interval based on Beta distribution</li>
+<li><cite>wilson</cite> : Wilson Score interval</li>
+<li><cite>jeffrey</cite> : Jeffrey&#8217;s Bayesian Interval</li>
+<li><cite>binom_test</cite></li>
+</ul>
 </dd></dl>
 
 <dl class="function">
@@ -672,12 +818,30 @@ do_XYZ, turn off and on various methods of estimating the confidence interval.</
 <dt id="clintrials.util.support_match">
 <tt class="descclassname">clintrials.util.</tt><tt class="descname">support_match</tt><big>(</big><em>a</em>, <em>b</em><big>)</big><a class="reference internal" href="_modules/clintrials/util.html#support_match"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.util.support_match" title="Permalink to this definition">¶</a></dt>
 <dd><p>Percentage score showing % of elements of a in b and b in a.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>a</strong> (<em>iterable</em>) &#8211; collection 1</li>
+<li><strong>b</strong> (<em>iterable</em>) &#8211; collection 2</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Match score from 0.0 to 1.0</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>
 </div>
-<div class="section" id="phase-i-trials">
-<h1>Phase I Trials<a class="headerlink" href="#phase-i-trials" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="phase-i-trial-designs">
+<h1>Phase I Trial Designs<a class="headerlink" href="#phase-i-trial-designs" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="dose-finding-based-on-toxicity">
 <h2>Dose-finding based on toxicity<a class="headerlink" href="#dose-finding-based-on-toxicity" title="Permalink to this headline">¶</a></h2>
 <p>These designs are used to find the maximum tolerable dose (MTD) for cytotoxic agents.</p>
@@ -688,7 +852,7 @@ do_XYZ, turn off and on various methods of estimating the confidence interval.</
 </div>
 </div>
 <div class="section" id="module-clintrials.phase2">
-<span id="phase-ii-trials"></span><h1>Phase II Trials<a class="headerlink" href="#module-clintrials.phase2" title="Permalink to this headline">¶</a></h1>
+<span id="phase-ii-trial-designs"></span><h1>Phase II Trial Designs<a class="headerlink" href="#module-clintrials.phase2" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
 <dt id="clintrials.phase2.bayesian_2stage_dich_design">
 <tt class="descclassname">clintrials.phase2.</tt><tt class="descname">bayesian_2stage_dich_design</tt><big>(</big><em>theta, p0, p1, N0, N1, p, q, prior_a=1, prior_b=1, labels=['StopAtInterim', 'StopAtFinal', 'GoAtFinal']</em><big>)</big><a class="reference internal" href="_modules/clintrials/phase2.html#bayesian_2stage_dich_design"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.phase2.bayesian_2stage_dich_design" title="Permalink to this definition">¶</a></dt>
@@ -765,6 +929,119 @@ do_XYZ, turn off and on various methods of estimating the confidence interval.</
 </div>
 </dd></dl>
 
+<div class="section" id="time-to-event-designs">
+<h2>Time-to-Event Designs<a class="headerlink" href="#time-to-event-designs" title="Permalink to this headline">¶</a></h2>
+<p>Time-to-event outcomes are not typical in phase II clinical trials, but they do exist.</p>
+<span class="target" id="module-clintrials.tte"></span><dl class="class">
+<dt id="clintrials.tte.BayesianTimeToEvent">
+<em class="property">class </em><tt class="descclassname">clintrials.tte.</tt><tt class="descname">BayesianTimeToEvent</tt><big>(</big><em>alpha_prior</em>, <em>beta_prior</em><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#BayesianTimeToEvent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.BayesianTimeToEvent" title="Permalink to this definition">¶</a></dt>
+<dd><p>An object-oriented implementation of a simple adaptive Bayesian design for time-to-event endpoints using a
+model assuming exponentially distributed event times and inverse-gamma prior beliefs on median survival time.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">See Thall, P.F., Wooten, L.H., &amp; Tannir, N.M. (2005) - <em>Monitoring Event Times in Early Phase Clinical
+Trials: Some Practical Issues</em> for full information.</p>
+</div>
+<p>This class satisfies the interface for a time-to-event trial in the clintrials package, i.e. it supports methods:</p>
+<ul class="simple">
+<li>event_times()</li>
+<li>recruitment_times()</li>
+<li>update(cases)</li>
+<li>test(time, kwargs)</li>
+</ul>
+<dl class="method">
+<dt id="clintrials.tte.BayesianTimeToEvent.event_times">
+<tt class="descname">event_times</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#BayesianTimeToEvent.event_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.BayesianTimeToEvent.event_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get list of the times at which events occurred.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">list of event times in the order they were provided</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.tte.BayesianTimeToEvent.recruitment_times">
+<tt class="descname">recruitment_times</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#BayesianTimeToEvent.recruitment_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.BayesianTimeToEvent.recruitment_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get list of the times at which patients were recruited.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">list of recruitment times in the order they were provided</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.tte.BayesianTimeToEvent.test">
+<tt class="descname">test</tt><big>(</big><em>time</em>, <em>cutoff</em>, <em>probability</em>, <em>less_than=True</em><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#BayesianTimeToEvent.test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.BayesianTimeToEvent.test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test posterior belief that median time-to-event parameter is less than or greater than some boundary value.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>time</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; test at this time</li>
+<li><strong>cutoff</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; test median time against this critical value</li>
+<li><strong>probability</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; require at least this degree of posterior certainty to declare significance</li>
+<li><strong>less_than</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; True, to test parameter is less than cut-off, a-posteriori. False to test greater than</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">JSON-able dict object reporting test output</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="clintrials.tte.BayesianTimeToEvent.update">
+<tt class="descname">update</tt><big>(</big><em>cases</em><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#BayesianTimeToEvent.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.BayesianTimeToEvent.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update the trial with new patient cases.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>cases</strong> (<a class="reference external" href="http://docs.python.org/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; list of cases expressed as 2-tuples, (event_time, recruitment_time)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Nothing</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">None</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="clintrials.tte.thall_bayesian_time_to_event_sim">
+<tt class="descclassname">clintrials.tte.</tt><tt class="descname">thall_bayesian_time_to_event_sim</tt><big>(</big><em>n_simulations</em>, <em>n_patients</em>, <em>true_median</em>, <em>alpha_prior</em>, <em>beta_prior</em>, <em>lower_cutoff</em>, <em>upper_cutoff</em>, <em>interim_certainty</em>, <em>final_certainty</em>, <em>interim_analysis_after_patients</em>, <em>interim_analysis_time_delta</em>, <em>final_analysis_time_delta</em>, <em>recruitment_stream</em><big>)</big><a class="reference internal" href="_modules/clintrials/tte.html#thall_bayesian_time_to_event_sim"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#clintrials.tte.thall_bayesian_time_to_event_sim" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simulate instances of Thall, Wooten &amp; Tannir&#8217;s simple Bayesian design for trials of event times.</p>
+<div class="deprecated">
+<p><span class="versionmodified">Deprecated since version 0.1: </span>Use <a class="reference internal" href="#clintrials.tte.BayesianTimeToEvent" title="clintrials.tte.BayesianTimeToEvent"><tt class="xref py py-class docutils literal"><span class="pre">BayesianTimeToEvent</span></tt></a> instead.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">See Thall, P.F., Wooten, L.H., &amp; Tannir, N.M. (2005) - <em>Monitoring Event Times in Early Phase Clinical
+Trials: Some Practical Issues</em> for full information.</p>
+</div>
+</dd></dl>
+
+</div>
 </div>
 <div class="section" id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
@@ -792,12 +1069,15 @@ do_XYZ, turn off and on various methods of estimating the confidence interval.</
 <li><a class="reference internal" href="#module-clintrials.util">Util</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#phase-i-trials">Phase I Trials</a><ul>
+<li><a class="reference internal" href="#phase-i-trial-designs">Phase I Trial Designs</a><ul>
 <li><a class="reference internal" href="#dose-finding-based-on-toxicity">Dose-finding based on toxicity</a></li>
 <li><a class="reference internal" href="#dose-finding-based-on-efficacy-and-toxicity">Dose-finding based on efficacy and toxicity</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-clintrials.phase2">Phase II Trials</a></li>
+<li><a class="reference internal" href="#module-clintrials.phase2">Phase II Trial Designs</a><ul>
+<li><a class="reference internal" href="#time-to-event-designs">Time-to-Event Designs</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 

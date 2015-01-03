@@ -12,9 +12,9 @@ Contents: BLAH
    :maxdepth: 2
 
 
+
 Common, helpful stuff
 ======================
-
 
 General functions
 __________________
@@ -29,6 +29,8 @@ See http://cran.r-project.org/web/packages/dfcrm/dfcrm.pdf
 
 .. automodule:: clintrials.common
     :members: empiric, inverse_empiric, logistic, inverse_logistic, hyperbolic_tan, inverse_hyperbolic_tan
+
+
 
 Coll
 ____
@@ -48,8 +50,9 @@ _____
     :members:
 
 
-Phase I Trials
-===================
+
+Phase I Trial Designs
+======================
 Dose-finding based on toxicity
 _______________________________
 
@@ -62,11 +65,21 @@ ____________________________________________
 These designs are used to find the optimum biological dose (OBD) for cytotoxic and cytostatic agents.
 
 
-Phase II Trials
-===================
+
+Phase II Trial Designs
+=======================
 
 .. automodule:: clintrials.phase2
     :members:
+
+Time-to-Event Designs
+______________________
+
+Time-to-event outcomes are not typical in phase II clinical trials, but they do exist.
+
+.. automodule:: clintrials.tte
+    :members:
+
 
 
 Indices and tables

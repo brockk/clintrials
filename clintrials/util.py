@@ -228,7 +228,17 @@ def levenshtein_index(s1, s2):
 
 
 def support_match(a, b):
-    """ Percentage score showing % of elements of a in b and b in a."""
+    """ Percentage score showing % of elements of a in b and b in a.
+
+    :param a: collection 1
+    :type a: iterable
+    :param b: collection 2
+    :type b: iterable
+    :return: Match score from 0.0 to 1.0
+    :rtype: float
+
+    """
+
     try:
         a_set = set(a)
         b_set = set(b)
@@ -271,21 +281,22 @@ def _correlated_binary_outcomes_solve2(mui, muj, psi):
 def correlated_binary_outcomes(num_pairs, u, psi, seed=None):
     """ Randomly sample correlated binary digits, copying the method from R-package ranBin2.
 
-    Params:
-    num_pairs, number of pairs
-    u, 2-item list/tuple of event probabilities
-    psi, odds ratio of the binary outcomes
-    seed, optional seed for reproducible randomness
+    :param num_pairs: number of pairs
+    :type num_pairs: int
+    :param u: 2-item list/tuple of event probabilities
+    :type u: list or tuple
+    :param psi: odds ratio of the binary outcomes
+    :type psi: float
+    :param seed: optional seed for reproducible randomness
+    :type seed: int
+    :return: ndarray of paired binary digits, 2 columns and num_pairs rows
+    :rtype: numpy.ndarray
 
-    Note: The Bonett article at
-    http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf
-    details Yule's method (1912) for estimating correlation from odds ratio and vice-versa.
-    If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
-        OR = ((1+r) / (1-r))**2
-    provide decent approximations.
-
-    Returns:
-    num_pairs * 2 numpy array, paired observations in rows.
+    .. note:: The Bonett article at http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf
+                details Yule's method (1912) for estimating correlation from odds ratio and vice-versa.
+                If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+                OR = ((1+r) / (1-r))**2
+                provide decent approximations.
 
     """
     if seed:
@@ -302,23 +313,23 @@ def correlated_binary_outcomes(num_pairs, u, psi, seed=None):
 def correlated_binary_outcomes_from_uniforms(unifs, u, psi):
     """ Create correlated binary outcomes from observed n*3 array of uniforms, tweaking method from R-package ranBin2.
 
-    Params:
-    unifs, array of shape (n, 3) of uniforms between 0 and 1
-    u, 2-item list/tuple of event probabilities
-    psi, odds ratio of the binary outcomes
+    :param unifs: array of shape (n, 3) of uniforms between 0 and 1
+    :type unifs: numpy.ndarray
+    :param u: 2-item list/tuple of event probabilities
+    :type u: list or tuple
+    :param psi: odds ratio of the binary outcomes
+    :type psi: float
+    :return: ndarray of paired binary digits, 2 columns and num_pairs rows
+    :rtype: numpy.ndarray
 
-    Note: The Bonett article at
-    http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf
-    details Yule's method (1912) for estimating correlation from odds ratio and vice-versa.
-    If the two proportions in u are close,
-        r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
-        OR = ((1+r) / (1-r))**2
-    provide decent approximations.
-
-    Returns:
-    n * 2 numpy array, paired observations in rows, where n is num rows in unifs
+    .. note:: The Bonett article at http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf
+                details Yule's method (1912) for estimating correlation from odds ratio and vice-versa.
+                If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and
+                OR = ((1+r) / (1-r))**2
+                provide decent approximations.
 
     """
+
     if unifs.ndim == 2 and unifs.shape[1] == 3:
         u12 = _correlated_binary_outcomes_solve2(u[0], u[1], psi)
         n = unifs.shape[0]
@@ -334,17 +345,36 @@ def get_proportion_confint_report(num_successes, num_trials, alpha=0.05, do_norm
                                   do_beta=False, do_wilson=True, do_jeffrey=False, do_binom_test=False):
     """ Get confidence intervals of proportion num_successes / num_trials using different methods in JSON-friendly form.
 
-    Params:
-    num_successes & num_trials, you seek confidence interval(s) of the proportion with mean = num_successes / num_trials
-    alpha, is significance used in statistical inferences
-    do_XYZ, turn off and on various methods of estimating the confidence interval.
-            Why do I use normal, agresti_coull and wilson by default?
-            1) Normal, because it is the widely-used but flawed option.
-            2) AgrestiCoull & Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper
-            "Interval Estimation for a Binomial Proportion" say:
-            'we recommend the Wilson interval for small n and the interval suggested in Agresti and Coull for larger n'
+    :param num_successes: number of successes
+    :type num_successes: int
+    :param num_trials: number of trials or attempts
+    :type num_trials: int
+    :param alpha: significance used in statistical inferences
+    :type alpha: float
+    :param do_normal: True to get a confidence interval using the normal approximation method
+    :type do_normal: bool
+    :param do_agresti_coull: True to get a confidence interval using the Agresti-Coull method
+    :type do_agresti_coull: bool
+    :param do_beta: True to get a confidence interval using the beta method
+    :type do_beta: bool
+    :param do_wilson: True to get a confidence interval using the Wilson method
+    :type do_wilson: bool
+    :param do_jeffrey: True to get a confidence interval using the Jeffrey method
+    :type do_jeffrey: bool
+    :param do_binom_test: True to get a confidence interval using the binomial test method
+    :type do_binom_test: bool
+    :return: JSON-able dict report
+    :rtype: dict
+
+    Why do I use normal, agresti_coull and wilson by default?
+
+    1) Normal, because it is the widely-used but flawed option.
+    2) AgrestiCoull & Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper
+        `Interval Estimation for a Binomial Proportion` say 'we recommend the Wilson interval for small n and the
+        interval suggested in Agresti and Coull for larger n'
 
     Call to proportion_confint allows methods:
+
     - `normal` : asymptotic normal approximation
     - `agresti_coull` : Agresti-Coull interval
     - `beta` : Clopper-Pearson interval based on Beta distribution
@@ -416,11 +446,19 @@ def get_proportion_confint_report(num_successes, num_trials, alpha=0.05, do_norm
 def cross_tab(col_row_pairs, cols=None, rows=None, to_json=False, do_value_counts=False):
     """ Cross-tabulate counts of data pairs.
 
-    Params:
-    col_row_pairs, list of 2-tuples, (col item, row item), e.g. [('1', 'Related'), ('2', 'Unrelated'), ('2', 'Related')]
-    cols, list of col-headers. Distinct items will be used if omitted.
-    rows, list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.
-    to_json, True to return JSON-able object; False to get a Pandas DataFrame
+    :param col_row_pairs: list of 2-tuples, (col item, row item), e.g.
+                            [('1', 'Related'), ('2', 'Unrelated'), ('2', 'Related')]
+    :type col_row_pairs: list
+    :param cols: list of col-headers. Distinct items will be used if omitted.
+    :type cols: list
+    :param rows: list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.
+    :type rows: list
+    :param to_json: True to return JSON-able object; False to get a pandas.DataFrame
+    :type to_json: bool
+    :param do_value_counts: True to return value counts
+    :type do_value_counts: bool
+    :return: pivottable-style cross tabulation
+    :rtype: dict of pandas.DataFrame
 
     """
 
@@ -448,6 +486,7 @@ class Memoize:
     """ Class to transparently cache function results by their runtime args
 
     E.g.
+
     >>> f = lambda x: x**3
     >>> f = Memoize(f)
     >>> f(2.0) # Result is calculated and cached
@@ -474,11 +513,27 @@ class ParameterSpace:
         self.vals_map = {}
 
     def add(self, label, values):
-        """ Add a variable and a list of all values the variable may take. """
+        """ Add a variable and a list of all values the variable may take.
+
+        :param label: variable label or name
+        :type label: str
+        :param values: list of values that variable may take
+        :type values: list
+
+        """
+
         self.vals_map[label] = values
 
     def sample(self, label):
-        """ Randomly fetch a value for variable with label. """
+        """ Randomly fetch a value for variable with label.
+
+        :param label: variable label or name
+        :type label: str
+        :return: randomly-sampled value
+        :rtype: object
+
+        """
+
         if label in self.vals_map:
             vals = self.vals_map[label]
             return vals[np.random.choice(range(len(vals)))]
@@ -486,16 +541,38 @@ class ParameterSpace:
             return None
 
     def sample_all(self):
-        """ Randomly fetch one value for each variable, returned as a map from label to value. """
+        """ Randomly sample a value for each variable, returned as a map from label to value.
+
+        :return: a randomly sampled set of parameter values
+        :rtype: dict
+
+        """
+
         sampled = {}
         for label in self.vals_map:
             sampled[label] = self.sample(label)
         return sampled
 
     def get_cyclical_iterator(self, limit=-1):
+        """ Get iterator to **deterministically** cycle the possible parameter perumtations, optionally forever.
+
+        :param limit: -1 to iterate cyclically forever, else maximum number of elements to iterate through.
+        :type limit: int
+        :return: an iterable object
+        :rtype: iterable
+
+        """
+
         return _ParameterSpaceIter(self, limit)
 
     def keys(self):
+        """ Get parameter space keys, i.e. the variable names
+
+        :return: Collection of keys
+        :rtype: iterable
+
+        """
+
         return self.vals_map.keys()
 
     def __getitem__(self, key):

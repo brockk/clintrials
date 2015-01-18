@@ -41,8 +41,16 @@ ____
 
 Recruitment
 ____________
-.. automodule:: clintrials.recruitment
-    :members: RecruitmentStream, ConstantRecruitmentStream, QuadrilateralRecruitmentStream
+.. autoclass:: clintrials.recruitment.RecruitmentStream
+   :members:
+   :special-members:
+.. autoclass:: clintrials.recruitment.ConstantRecruitmentStream
+   :members:
+   :special-members:
+.. autoclass:: clintrials.recruitment.QuadrilateralRecruitmentStream
+   :members:
+   :special-members:
+
 
 Util
 _____

@@ -24,6 +24,10 @@ class BayesianTimeToEvent():
     - update(cases)
     - test(time, kwargs)
 
+    .. note:: the event times are time-deltas *relative to the recruitment times*. E.g. recruitment at t=1
+                and event at t=2 means the event took place at absolute time t=3. Using deltas gets around
+                the silly scenario where events might occur before recruitment.
+
     """
 
     def __init__(self, alpha_prior, beta_prior):
@@ -127,10 +131,10 @@ class BayesianTimeToEvent():
         return test_report
 
 
-def thall_bayesian_time_to_event_sim(n_simulations, n_patients, true_median, alpha_prior, beta_prior,
-                                     lower_cutoff, upper_cutoff, interim_certainty, final_certainty,
-                                     interim_analysis_after_patients, interim_analysis_time_delta,
-                                     final_analysis_time_delta, recruitment_stream):
+def matrix_cohort_analysis(n_simulations, n_patients, true_median, alpha_prior, beta_prior,
+                           lower_cutoff, upper_cutoff, interim_certainty, final_certainty,
+                           interim_analysis_after_patients, interim_analysis_time_delta,
+                           final_analysis_time_delta, recruitment_stream):
     """ Simulate instances of Thall, Wooten & Tannir's simple Bayesian design for trials of event times.
 
     .. deprecated:: 0.1
@@ -200,21 +204,3 @@ def thall_bayesian_time_to_event_sim(n_simulations, n_patients, true_median, alp
         return reports[0]
     else:
         return reports
-
-
-# n_patients = 30
-# true_median = 3
-# alpha_prior, beta_prior = 0.001, 0.001
-# lower_cutoff, upper_cutoff = 3, 3
-# p_0, p_1 = 0.8, 0.6
-# interim_analysis_after_patients = [15, 45, 90]
-# interim_analysis_time_delta = 0
-# final_analysis_time_delta = 3
-# ppd = 0.667
-# thall_bayesian_time_to_event_sim(n_simulations=1, n_patients=n_patients, true_median=true_median,
-#                                  alpha_prior=alpha_prior, beta_prior=beta_prior,
-#                                  lower_cutoff=lower_cutoff, upper_cutoff=upper_cutoff,
-#                                  p_0=p_0, p_1=p_1, interim_analysis_after_patients=interim_analysis_after_patients,
-#                                  interim_analysis_time_delta=interim_analysis_time_delta,
-#                                  final_analysis_time_delta=final_analysis_time_delta,
-#                                  ppd=ppd)

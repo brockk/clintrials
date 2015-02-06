@@ -22,6 +22,7 @@ class DoseFindingTrial(object):
     status()
     reset()
     number_of_doses()
+    first_dose()
     size()
     max_size()
     doses()
@@ -93,6 +94,12 @@ class DoseFindingTrial(object):
     def number_of_doses(self):
         """ How many dose-levels are under investigation?"""
         return self.num_doses
+
+    def first_dose(self):
+        """ Get first dose
+        :return: First dose
+        """
+        return self._first_dose
 
     def size(self):
         """ How many patients have been treated? """
@@ -553,6 +560,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     status()
     reset()
     number_of_doses()
+    first_dose()
     size()
     max_size()
     doses()
@@ -627,6 +635,13 @@ class EfficacyToxicityDoseFindingTrial(object):
     def number_of_doses(self):
         """ How many dose-levels are under investigation?"""
         return self.num_doses
+
+    def first_dose(self):
+        """
+        Get the first dose
+        :return: first dose
+        """
+        return self._first_dose
 
     def size(self):
         """ How many patients have been treated? """

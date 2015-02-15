@@ -135,10 +135,7 @@ def matrix_cohort_analysis(n_simulations, n_patients, true_median, alpha_prior, 
                            lower_cutoff, upper_cutoff, interim_certainty, final_certainty,
                            interim_analysis_after_patients, interim_analysis_time_delta,
                            final_analysis_time_delta, recruitment_stream):
-    """ Simulate instances of Thall, Wooten & Tannir's simple Bayesian design for trials of event times.
-
-    .. deprecated:: 0.1
-        Use :class:`BayesianTimeToEvent` instead.
+    """ Simulate TTE outcomes in the National Lung Matrix trial.
 
     .. note:: See Thall, P.F., Wooten, L.H., & Tannir, N.M. (2005) - *Monitoring Event Times in Early Phase Clinical
             Trials: Some Practical Issues* for full information.

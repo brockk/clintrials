@@ -858,6 +858,21 @@ def find_mtd(toxicity_target, scenario, strictly_lte=False, verbose=False):
     :return: 1-based location of MTD
     :rtype: int
 
+    For example,
+
+    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=0)
+    2
+    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=1)
+    2
+    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=0)
+    1
+    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=1)
+    0
+    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=0)
+    3
+    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=1)
+    2
+
     """
 
     if toxicity_target in scenario:

@@ -9,10 +9,11 @@ import abc
 from collections import OrderedDict
 import logging
 import numpy as np
+import pandas as pd
 from scipy.stats import uniform
 
 from clintrials.util import atomic_to_json, iterable_to_json
-from clintrials.util import correlated_binary_outcomes_from_uniforms
+from clintrials.util import correlated_binary_outcomes_from_uniforms, to_1d_list
 
 
 class DoseFindingTrial(object):
@@ -840,3 +841,94 @@ def simulate_efficacy_toxicity_dose_finding_trials(design_map, true_toxicities, 
                                                                    cohort_size=cohort_size, to_json=1)
         report[label] = design_sim
     return report
+
+
+def find_mtd(toxicity_target, scenario, strictly_lte=False, verbose=False):
+    """ Find the MTD in a list of toxicity probabilities and a target toxicity rate.
+
+    :param toxicity_target: target probability of toxicity
+    :type toxicity_target: float
+    :param scenario: list of probabilities of toxicity at each dose
+    :type scenario: list
+    :param strictly_lte: True to demand that Prob(toxicity) at MD is <= toxicity_target;
+                         False to allow it to be over if it is near.
+    :type strictly_lte: bool
+    :param verbose: True to print output
+    :type verbose: bool
+    :return: 1-based location of MTD
+    :rtype: int
+
+    """
+
+    if toxicity_target in scenario:
+        # Return exact match
+        loc = scenario.index(toxicity_target) + 1
+        if verbose:
+            print 'MTD is', loc
+        return loc
+    else:
+        if strictly_lte:
+            if sum(np.array(scenario) <= toxicity_target) == 0:
+                # Infeasible scenario
+                if verbose:
+                    print 'All doses are too toxic'
+                return 0
+            else:
+                # Return highest tox no greater than target
+                objective = np.where(np.array(scenario)<=toxicity_target, toxicity_target-np.array(scenario), np.inf)
+                loc = np.argmin(objective) + 1
+                if verbose:
+                    print 'Highest dose below MTD is', loc
+                return loc
+        else:
+            # Return nearest
+            loc = np.argmin(np.abs(np.array(scenario) - toxicity_target)) + 1
+            if verbose:
+                print 'Dose nearest to MTD is', loc
+            return loc
+
+
+def print_sims_summary(sims, label, num_doses, filter={}):
+    """ Analyse a set of dose-finding simulations and print results to screen.
+
+    :param sims: list of JSON reps of dose-finding trial outcomes
+    :type sims: list
+    :param label: name of simulation at first level in each JSON object
+    :type label: str
+    :param num_doses: number of dose levels under study
+    :type num_doses: int
+    :param filter: map of item to item-value to filter list of simulations
+    :type filter: dict
+    :return: 3-tuple, (doses chosen, doses given to patients, trial end statuses), each as numpy array.
+    :rtype: tuple
+
+    """
+
+    # Quick and dirty filter
+    for key, val in filter.iteritems():
+        sims = [x for x in sims if x[key] == val]
+
+    # Recommended Doses
+    doses = [x[label]['RecommendedDose'] for x in sims]
+    df_doses = pd.DataFrame({'RecN': pd.Series(doses).value_counts()}, index=range(0,num_doses+1))
+    df_doses['Rec%'] = 1.0 * df_doses['RecN'] / df_doses['RecN'].sum()
+
+    # Given Doses
+    doses_given = to_1d_list([x[label]['Doses'] for x in sims])
+    df_doses = df_doses.join(pd.DataFrame({'PatN': pd.Series(doses_given).value_counts()}))
+    df_doses['Pat%'] = 1.0 * df_doses['PatN'] / df_doses['PatN'].sum()
+
+    # Trial Outcomes
+    statuses = [x[label]['TrialStatus'] for x in sims]
+    df_statuses = pd.DataFrame({'N': pd.Series(statuses).value_counts()})
+    df_statuses['%'] = 1.0 * df_statuses['N'] / df_statuses['N'].sum()
+
+    if filter:
+        print filter
+        print
+    print df_doses.loc[range(0, 6+1)]
+    print
+    print df_statuses.loc[[-1,0,1,100]]
+    print
+
+    return np.array(doses), np.array(doses_given), np.array(statuses)

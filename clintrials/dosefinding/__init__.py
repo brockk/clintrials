@@ -7,6 +7,7 @@ __all__ = ["crm", "efftox", "novel", "wagestait"]
 
 import abc
 from collections import OrderedDict
+from itertools import product
 import logging
 import numpy as np
 import pandas as pd
@@ -903,8 +904,8 @@ def find_mtd(toxicity_target, scenario, strictly_lte=False, verbose=False):
             return loc
 
 
-def print_sims_summary(sims, label, num_doses, filter={}):
-    """ Analyse a set of dose-finding simulations and print results to screen.
+def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
+    """ Summarise a list of dose-finding simulations for doses recommended, doses given and trial outcome.
 
     :param sims: list of JSON reps of dose-finding trial outcomes
     :type sims: list
@@ -914,7 +915,8 @@ def print_sims_summary(sims, label, num_doses, filter={}):
     :type num_doses: int
     :param filter: map of item to item-value to filter list of simulations
     :type filter: dict
-    :return: 3-tuple, (doses chosen, doses given to patients, trial end statuses), each as numpy array.
+    :return: 5-tuple, (doses DataFrame, outcomes DataFrame, doses chosen, doses given to patients,
+                        trial end statuses), the first two as pandas DataFrames and the latter three as numpy arrays.
     :rtype: tuple
 
     """
@@ -927,23 +929,66 @@ def print_sims_summary(sims, label, num_doses, filter={}):
     doses = [x[label]['RecommendedDose'] for x in sims]
     df_doses = pd.DataFrame({'RecN': pd.Series(doses).value_counts()}, index=range(0,num_doses+1))
     df_doses['Rec%'] = 1.0 * df_doses['RecN'] / df_doses['RecN'].sum()
-
     # Given Doses
     doses_given = to_1d_list([x[label]['Doses'] for x in sims])
     df_doses = df_doses.join(pd.DataFrame({'PatN': pd.Series(doses_given).value_counts()}))
     df_doses['Pat%'] = 1.0 * df_doses['PatN'] / df_doses['PatN'].sum()
+    # Order
+    df_doses = df_doses.loc[range(0, num_doses+1)]
 
     # Trial Outcomes
     statuses = [x[label]['TrialStatus'] for x in sims]
     df_statuses = pd.DataFrame({'N': pd.Series(statuses).value_counts()})
     df_statuses['%'] = 1.0 * df_statuses['N'] / df_statuses['N'].sum()
 
-    if filter:
-        print filter
-        print
-    print df_doses.loc[range(0, 6+1)]
-    print
-    print df_statuses.loc[[-1,0,1,100]]
-    print
+    return df_doses, df_statuses, np.array(doses), np.array(doses_given), np.array(statuses)
 
-    return np.array(doses), np.array(doses_given), np.array(statuses)
+
+def batch_summarise_dose_finding_sims(sims, label, num_doses, dimensions=None, func1=None):
+    """ Batch summarise a list of dose-finding simulations.
+
+    The dimensions along which to group and simmarise the simulations are determined via dimensions (see below)
+
+    :param sims: list of JSON reps of dose-finding trial outcomes
+    :type sims: list
+    :param label: name of simulation at first level in each JSON object
+    :type label: str
+    :param num_doses: number of dose levels under study
+    :type num_doses: int
+    :param dimensions: 2-tuple, (dict of JSON variable name -> arg name in ParameterSpace, instance of ParameterSpace)
+    :type dimensions: tuple
+    :param func1: Function that takes pandas.DataFrame as first arg and a dict of variable name -> values as second arg
+                    and returns summary output.
+                    Use func1=None to just see the pandas.DataFrames printed as summary.
+    :type func1: func
+
+    .. note::
+        This function is a bit of a mess but it is useful.
+
+    """
+    if dimensions is not None:
+        var_map, params = dimensions
+        z = [(k, params[v]) for k,v in var_map.iteritems()]
+        labels, val_arrays = zip(*z)
+        param_combinations = list(product(*val_arrays))
+        for param_combo in param_combinations:
+            for lab, vals in zip(labels, param_combo):
+                print '{}: {}'.format(lab, vals)
+            these_params = dict(zip(labels, param_combo))
+            abc = summarise_dose_finding_sims(sims, label, num_doses, filter=these_params)
+            if func1:
+                print func1(abc[0], these_params)
+                print
+                print
+            else:
+                print
+                print abc[0]
+                print
+                print abc[1]
+                print
+    else:
+        abc = summarise_dose_finding_sims(sims, label, num_doses)
+        print abc[0]
+        print
+        print abc[1]
+        print

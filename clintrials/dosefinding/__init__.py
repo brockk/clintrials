@@ -919,6 +919,9 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
                         trial end statuses), the first two as pandas DataFrames and the latter three as numpy arrays.
     :rtype: tuple
 
+    .. note::
+        This function is a bit of a mess but it is useful. Use methods in clintrials.simulation instead.
+
     """
 
     # Quick and dirty filter
@@ -963,7 +966,7 @@ def batch_summarise_dose_finding_sims(sims, label, num_doses, dimensions=None, f
     :type func1: func
 
     .. note::
-        This function is a bit of a mess but it is useful.
+        This function is a bit of a mess but it is useful. Use methods in clintrials.simulation instead.
 
     """
     if dimensions is not None:

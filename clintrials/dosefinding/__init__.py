@@ -13,8 +13,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import uniform
 
-from clintrials.util import atomic_to_json, iterable_to_json
-from clintrials.util import correlated_binary_outcomes_from_uniforms, to_1d_list
+from clintrials.util import (atomic_to_json, iterable_to_json,
+                             correlated_binary_outcomes_from_uniforms, to_1d_list)
+from clintrials.simulation import filter_sims
 
 
 class DoseFindingTrial(object):
@@ -579,8 +580,8 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
     """
 
     # Quick and dirty filter
-    for key, val in filter.iteritems():
-        sims = [x for x in sims if x[key] == val]
+    if len(filter):
+        sims = filter_sims(sims, filter)
 
     # Recommended Doses
     doses = [x[label]['RecommendedDose'] for x in sims]
@@ -590,6 +591,7 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
     doses_given = to_1d_list([x[label]['Doses'] for x in sims])
     df_doses = df_doses.join(pd.DataFrame({'PatN': pd.Series(doses_given).value_counts()}))
     df_doses['Pat%'] = 1.0 * df_doses['PatN'] / df_doses['PatN'].sum()
+    df_doses['MeanPat']= 1.0 * df_doses['PatN'] / len(sims)
     # Order
     df_doses = df_doses.loc[range(0, num_doses+1)]
 

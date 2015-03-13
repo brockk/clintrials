@@ -292,7 +292,6 @@ class CRM(DoseFindingTrial):
         return
 
     def _DoseFindingTrial__calculate_next_dose(self):
-        # TODO: control escalating after toxicity?
         current_dose = self.next_dose()
         proposed_dose, beta_hat, beta_var = crm(prior=self.prior, target=self.target, toxicities=self._toxicities,
                                                 dose_levels=self._doses, first_dose=self._first_dose,

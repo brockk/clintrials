@@ -310,9 +310,9 @@ class CRM(DoseFindingTrial):
 
         # Toxicity at lowest dose
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:
-            labels = [self.inverse_F(p, a0=self.first_dose, beta=self.beta_prior.mean()) for p in self.prior]
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
             beta_sample = norm(loc=beta_hat, scale=np.sqrt(beta_var)).rvs(1000000)  # N.b. normal sample a la prior
-            p0_sample = self.F_func(labels[0], a0=self.first_dose, beta=beta_sample)
+            p0_sample = self.F_func(labels[0], a0=self.first_dose(), beta=beta_sample)
             p0_tox = np.mean(p0_sample > self.lowest_dose_too_toxic_hurdle)
 
             if p0_tox > self.lowest_dose_too_toxic_certainty:
@@ -320,6 +320,12 @@ class CRM(DoseFindingTrial):
                 self._status = -1
 
         return proposed_dose
+
+    def prob_tox(self):
+        labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+        beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(1000000)  # N.b. normal sample as prior
+        p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+        return np.array([np.mean(x) for x in p0_sample])
 
     def has_more(self):
         """ Is the trial ongoing? """

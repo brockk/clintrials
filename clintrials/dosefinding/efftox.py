@@ -551,3 +551,42 @@ def efftox_sim(n_patients, true_toxicities, true_efficacies, first_dose,
     for k, x in enumerate(np.array(utility).T):
         thing[utility_label + str(k+1)] = x
     return trial.next_dose(), pd.concat([df1, df2, df3, df4], axis=1), trial_outcome
+
+
+def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):
+    """ Solve a metrizable efficacy-toxicity dose-finding scenario.
+
+    Metrizable means that the priority of doses can be calculated using a metric.
+    This function returns, as a 5-tuple, (an array representing the admissable set, an array of utlities,
+    the utility of the optimal dose, the 1-based OBD level, the utility distance from the next most preferable dose)
+
+    :param prob_tox: Probabilities of toxicity at each dose
+    :type prob_tox: iterable
+    :param prob_eff: Probabilities of efficacy at each dose
+    :type prob_eff: iterable
+    :param metric: Metric to score
+    :type metric: class like clintrials.dosefinding.efftox.LpNormCurve or func(prob_eff, prob_tox) returning float
+    :param tox_cutoff: maximum acceptable toxicity probability
+    :type tox_cutoff: float
+    :param eff_cutoff: minimum acceptable efficacy probability
+    :type eff_cutoff: float
+
+    """
+    if len(prob_tox) != len(prob_eff):
+        raise Exception('prob_tox and prob_eff should be lists or tuples of the same length.')
+    t = prob_tox
+    r = prob_eff
+    admiss = np.array([(eff > eff_cutoff) and (tox < tox_cutoff) for eff, tox in zip(r, t)])
+    util = np.array([metric(eff, tox) for eff, tox in zip(r, t)])
+    admissable_util = np.where(admiss, util, -np.inf)
+    if sum(admiss) >= 2:
+        obd = np.nanargmax(admissable_util)+1
+        u2, u1 = np.sort(admissable_util)[-2:]
+        u_cushion = u1 - u2
+        return admiss, util, u1, obd, u_cushion
+    elif sum(admiss) >= 1:
+        obd = np.nanargmax(admissable_util)+1
+        u1 = np.nanmax(admissable_util)
+        return admiss, util, u1, obd, np.nan
+    else:
+        return admiss, util, max(util), -1, np.nan

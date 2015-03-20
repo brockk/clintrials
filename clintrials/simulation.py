@@ -3,12 +3,12 @@ __contact__ = 'kristian.brock@gmail.com'
 
 
 from datetime import datetime
-from itertools import product
+import itertools
 import json
 import pandas as pd
 
 
-def sim_parameter_space(sim_func, ps, n1=10, n2=10, out_file=None):
+def sim_parameter_space(sim_func, ps, n1=1, n2=None, out_file=None):
     """ Run simulations using a function and a ParameterSpace.
 
     :param sim_func: function to be called to yield single simulation. Parameters are provided via ps as unpacked kwargs
@@ -23,10 +23,15 @@ def sim_parameter_space(sim_func, ps, n1=10, n2=10, out_file=None):
     :type out_file: str
 
     .. note::
-        n1 * n2 simualtions are performed, in all.
-        sim_func is expected to return a JSON-able object
+
+        - n1 * n2 simualtions are performed, in all.
+        - sim_func is expected to return a JSON-able object
+        - file is saved after each of n1 iterations, where applicable.
 
     """
+
+    if not n2 or n2 <= 0:
+        n2 = ps.size()
 
     sims = []
     params_iterator = ps.get_cyclical_iterator()
@@ -54,11 +59,8 @@ def filter_sims(sims, filter):
     """
 
     for key, val in filter.iteritems():
-        if isinstance(val, tuple):
-            # Mask tuples as lists because tuples are not JSON but lists are
-            sims = [x for x in sims if x[key] == list(val)]
-        else:
-            sims = [x for x in sims if x[key] == val]
+        # In JSON, tuples are masked as lists. In this filter, we treat them as equivalent:
+        sims = [x for x in sims if x[key] == list(val) or x[key] == val]
     return sims
 
 
@@ -85,7 +87,7 @@ def summarise_sims(sims, ps, var_map, func_map, to_pandas=True):
     var_names = var_map.keys()
     z = [(var_name, ps[var_map[var_name]]) for var_name in var_names]
     labels, val_arrays = zip(*z)
-    param_combinations = list(product(*val_arrays))
+    param_combinations = list(itertools.product(*val_arrays))
     index_tuples = []
     row_tuples = []
     for param_combo in param_combinations:
@@ -95,8 +97,15 @@ def summarise_sims(sims, ps, var_map, func_map, to_pandas=True):
             these_metrics = dict([(label, func(these_sims, these_params)) for label, func in func_map.iteritems()])
             index_tuples.append(param_combo)
             row_tuples.append(these_metrics)
-    if to_pandas:
-        return pd.DataFrame(row_tuples, pd.MultiIndex.from_tuples(index_tuples, names=var_names))
+    if len(row_tuples):
+        if to_pandas:
+            return pd.DataFrame(row_tuples, pd.MultiIndex.from_tuples(index_tuples, names=var_names))
+        else:
+            # TODO
+            return row_tuples, index_tuples
     else:
-        # TODO
-        return row_tuples, index_tuples
+        if to_pandas:
+            pd.DataFrame(columns=func_map.keys())
+        else:
+            # TODO
+            return [], []

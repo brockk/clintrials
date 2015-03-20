@@ -575,6 +575,28 @@ class ParameterSpace:
 
         return self.vals_map.keys()
 
+    def dimensions(self):
+        """ Get the numbers of values per dimension.
+
+        E.g. a param-space of two values for A and three values for B would return [2, 3]
+
+        :return: Array of number of values per dimension
+        :rtype: numpy.array
+
+        """
+
+        return np.array([len(y) for x,y in self.vals_map.iteritems()])
+
+    def size(self):
+        """ Get the size of this parameter space, i.e. the product of the dimension sizes.
+
+        :return: Size of parameter space.
+        :rtype: int
+
+        """
+
+        return np.prod(self.dimensions())
+
     def __getitem__(self, key):
         return self.vals_map[key]
 

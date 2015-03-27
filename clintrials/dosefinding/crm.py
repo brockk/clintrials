@@ -321,11 +321,29 @@ class CRM(DoseFindingTrial):
 
         return proposed_dose
 
-    def prob_tox(self):
-        labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
-        beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(1000000)  # N.b. normal sample as prior
-        p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
-        return np.array([np.mean(x) for x in p0_sample])
+    def prob_tox(self, n=10**6):
+        if self.estimate_var:
+            # Estimate probability of toxicity using plug-in mean and variance for beta, and randomly
+            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
+            # TODO: research replacing this with a proper posterior integral when in bayes mode.
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+            beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
+            p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+            return np.array([np.mean(x) for x in p0_sample])
+        else:
+            raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
+
+    def prob_tox_exceeds(self, tox_cutoff, n=10**6):
+        if self.estimate_var:
+            # Estimate probability of toxicity exceeds tox_cutoff using plug-in mean and variance for beta, and randomly
+            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
+            # TODO: research replacing this with a proper posterior integral when in bayes mode.
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+            beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
+            p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+            return np.array([np.mean(x>tox_cutoff) for x in p0_sample])
+        else:
+            raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
 
     def has_more(self):
         """ Is the trial ongoing? """

@@ -67,7 +67,7 @@ def _L_n(D, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
     return response
 
 
-def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff=0.3, eff_cutoff=0.5, n=10**5):
+def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cutoff, n=10**5):
     """ Get the posterior probabilities after having observed cumulative data D in an EffTox trial.
 
     Note: This function evaluates the posterior integrals using Monte Carlo integration. Thall & Cook
@@ -190,6 +190,28 @@ class LpNormCurve:
         else:
             return np.nan
 
+    def solve(self, prob_eff=None, prob_tox=None, delta=0):
+        """ Specify exactly one of prob_eff or prob_tox and this will return the other, for given delta"""
+
+        if prob_eff is None and prob_tox is None:
+            raise Exception('Specify prob_eff or prob_tox')
+        if prob_eff is not None and prob_tox is not None:
+            raise Exception('Specify just one of prob_eff and prob_tox')
+
+        x, y = prob_eff, prob_tox
+        x_l, y_l = self.minimum_tolerable_efficacy, self.maximum_tolerable_toxicity
+        scaled_delta = (1-delta)**self.p
+        if x is None:
+            # Solve for x
+            b = y / y_l
+            a = (scaled_delta - b**self.p)**(1/self.p)
+            return 1 - (1 - x_l)*a
+        else:
+            # Solve for y
+            a = ((1 - x) / (1 - x_l))
+            b = (scaled_delta - a**self.p)**(1/self.p)
+            return b*y_l
+
 
 class InverseQuadraticCurve:
     """ Fit an indifference contour of the type, y = a + b/x + c/x^2 where y = Prob(Tox) and x = Prob(Eff).
@@ -238,6 +260,11 @@ class InverseQuadraticCurve:
             return d1 / d2 - 1
         else:
             return np.nan
+
+    def solve(self, prob_eff=None, prob_tox=None, delta=0):
+        """ Specify exactly one of prob_eff or prob_tox and this will return the other, for given delta"""
+        # TODO
+        raise NotImplementedError()
 
 # I used to call the InverseQuadraticCurve an ABC_Curve because it uses three parameters, a, b and c.
 # Similarly, I used to call the LpNormCurve a HingedCurve because it uses a hinge point.
@@ -556,7 +583,13 @@ def efftox_sim(n_patients, true_toxicities, true_efficacies, first_dose,
 def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):
     """ Solve a metrizable efficacy-toxicity dose-finding scenario.
 
+
     Metrizable means that the priority of doses can be calculated using a metric.
+    A dose is admissable if it has probability of toxicity less than some cutoff; and
+    probability of efficacy greater than some cutoff.
+    The OBD is the dose with the highest utility in the admissable set. The OBD does not
+    necessarily have a positive utility.
+
     This function returns, as a 5-tuple, (an array representing the admissable set, an array of utlities,
     the utility of the optimal dose, the 1-based OBD level, the utility distance from the next most preferable dose)
 

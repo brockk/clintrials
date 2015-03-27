@@ -585,7 +585,7 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
 
     # Recommended Doses
     doses = [x[label]['RecommendedDose'] for x in sims]
-    df_doses = pd.DataFrame({'RecN': pd.Series(doses).value_counts()}, index=range(0,num_doses+1))
+    df_doses = pd.DataFrame({'RecN': pd.Series(doses).value_counts()}, index=range(-1, num_doses+1))
     df_doses['Rec%'] = 1.0 * df_doses['RecN'] / df_doses['RecN'].sum()
     # Given Doses
     doses_given = to_1d_list([x[label]['Doses'] for x in sims])
@@ -593,7 +593,7 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
     df_doses['Pat%'] = 1.0 * df_doses['PatN'] / df_doses['PatN'].sum()
     df_doses['MeanPat']= 1.0 * df_doses['PatN'] / len(sims)
     # Order
-    df_doses = df_doses.loc[range(0, num_doses+1)]
+    df_doses = df_doses.loc[range(-1, num_doses+1)]
 
     # Trial Outcomes
     statuses = [x[label]['TrialStatus'] for x in sims]

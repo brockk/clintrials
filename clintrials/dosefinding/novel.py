@@ -80,7 +80,8 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
                  first_dose, max_size, stage_one_size=0,
                  F_func=empiric, inverse_F=inverse_empiric,
                  theta_prior=norm(0, np.sqrt(1.34)), beta_prior=norm(0, np.sqrt(1.34)),
-                 model_prior_weights=None, use_quick_integration=False, estimate_var=False,
+                 tox_certainty=0.05, deficient_efficacy_alpha=0.05,
+                 model_prior_weights=None, use_quick_integration=False, estimate_var=True,
                  prevent_skipping_untolerated=True, must_try_lowest_dose=True):
         """
 
@@ -99,6 +100,9 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         F_func and inverse_F, the link function and inverse for CRM method, e.g. logistic and inverse_logistic
         theta_prior, prior distibution for theta parameter, the single parameter in the efficacy models
         beta_prior, prior distibution for beta parameter, the single parameter in the toxicity CRM model
+        tox_certainty, significance to use when testing that lowest dose exceeds toxicity limit
+        deficient_efficacy_alpha, significance to use when testing that optimal dose has efficacy less than
+                                    efficacy limit
         model_prior_weights, vector of prior probabilities that each model is correct. None to use uniform weights
         use_quick_integration, numerical integration is slow. Set this to False to use the most accurate (slowest)
                                 method; False to use a quick but approximate method.
@@ -125,6 +129,8 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.inverse_F = inverse_F
         self.theta_prior = theta_prior
         self.beta_prior = beta_prior
+        self.tox_certainty = tox_certainty
+        self.deficient_efficacy_alpha = deficient_efficacy_alpha
         if model_prior_weights:
             if self.K != len(model_prior_weights):
                 ValueError('model_prior_weights should have %s items.' % self.K)
@@ -142,7 +148,8 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.w = np.zeros(self.K)
         self.crm = CRM(prior=prior_tox_probs, target=tox_target, first_dose=first_dose, max_size=max_size,
                        F_func=empiric, inverse_F=inverse_empiric, beta_prior=beta_prior,
-                       use_quick_integration=use_quick_integration, estimate_var=estimate_var)
+                       use_quick_integration=use_quick_integration, estimate_var=estimate_var,
+                       avoid_escalation_dose_skipping=True)
         self.post_tox_probs = np.zeros(self.I)
         self.post_eff_probs = np.zeros(self.I)
         self.theta_hats = np.zeros(self.K)
@@ -206,24 +213,31 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.w = w / sum(w)
         most_likely_model_index = np.argmax(w)
         self.most_likely_model_index = most_likely_model_index
+        # TODO: Plug-in means. Better way?
         self.post_eff_probs = empiric(self.skeletons[most_likely_model_index],
                                       beta=theta_hats[most_likely_model_index])
         self.post_tox_probs = empiric(self.prior_tox_probs, beta=self.crm.beta_hat)
 
         # Update combined model
         if self.size() < self.stage_one_size:
-            self._next_dose = self._stage_one_next_dose(self.post_tox_probs)
+            # self._next_dose = self._stage_one_next_dose(self.post_tox_probs)
+            self._next_dose = self._stage_one_next_dose()
         else:
             self._next_dose = self._stage_two_next_dose(self.post_tox_probs, self.post_eff_probs)
 
-        # Stop if lower bound of probability at lowest dose exceeds tox_limit:
-        if self.dose_toxicity_lower_bound(1) > self.tox_limit:
-            self._status = -3
-            self._next_dose = -1
-            self._admissable_set = []
+        # Removed code below because the test is better performed in _stage_one_next_dose
+        # and _stage_two_next_dose.
+        # # Stop if lower bound of probability at lowest dose exceeds tox_limit:
+        # if self.dose_toxicity_lower_bound(1, self.tox_certainty) > self.tox_limit:
+        #     self._status = -3
+        #     self._next_dose = -1
+        #     self._admissable_set = []
+
         # Stop if upper bound of efficacy at optimum dose is less than eff_limit
+        # TODO: In time, change this rule to use posterior probabilities too, like the way toxicity is
+        # tested in _stage_one_next_dose and _stage_two_next_dose.
         if self.size() >= self.stage_one_size:
-            if self.dose_efficacy_upper_bound(self._next_dose) < self.eff_limit:
+            if self.dose_efficacy_upper_bound(self._next_dose, self.deficient_efficacy_alpha) < self.eff_limit:
                 self._status = -4
                 self._next_dose = -1
                 self._admissable_set = []
@@ -252,8 +266,25 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
     # Private interface
-    def _stage_one_next_dose(self, tox_probs):
-        admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
+    # def _stage_one_next_dose(self, tox_probs):
+    #     admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
+    #     print tox_probs, admissable
+    #     admissable_set = [i+1 for i, x in enumerate(admissable) if x]
+    #     self._admissable_set = admissable_set
+    #     if sum(admissable) > 0:
+    #         self._status = 1
+    #         self.dose_allocation_mode = 0.5  # TODO
+    #         return self.crm.next_dose()
+    #     else:
+    #         # All doses are too toxic so stop trial
+    #         self._status = -1
+    #         self.dose_allocation_mode = 0
+    #         return -1
+
+    def _stage_one_next_dose(self):
+        # There is no scrutiny of what is efficable in 'admissable'
+        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)
+        admissable = [x < (1-self.tox_certainty) for x in prob_unacc_tox]
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         self._admissable_set = admissable_set
         if sum(admissable) > 0:
@@ -266,8 +297,37 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
             self.dose_allocation_mode = 0
             return -1
 
+    # def _stage_two_next_dose(self, tox_probs, eff_probs):
+    #     admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
+    #     admissable_set = [i+1 for i, x in enumerate(admissable) if x]
+    #     self._admissable_set = admissable_set
+    #     # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
+    #     # by the equation form that Thall & Cook chose.
+    #     utility = np.array([self.metric(x[0], x[1]) for x in zip(eff_probs, tox_probs)])
+    #     self.utility = utility
+    #     if sum(admissable) > 0:
+    #         # Select most desirable dose from admissable set
+    #         ideal_dose = np.arange(1, len(utility)+1)[admissable][np.argmax(utility[admissable])]  # Desirability-based
+    #         max_dose_given = self.maximum_dose_given()
+    #         if max_dose_given and ideal_dose - max_dose_given > 1:
+    #             # Prevent skipping untried doses in escalation
+    #             self._status = 1
+    #             self.dose_allocation_mode = 2
+    #             return max_dose_given + 1
+    #         else:
+    #             self._status = 1
+    #             self.dose_allocation_mode = 1
+    #             return ideal_dose
+    #     else:
+    #         # All doses are too toxic so stop trial
+    #         self._status = -1
+    #         self.dose_allocation_mode = 0
+    #         return -1
+
     def _stage_two_next_dose(self, tox_probs, eff_probs):
-        admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
+        # There is no scrutiny of what is efficable in 'admissable'
+        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)
+        admissable = [x < (1-self.tox_certainty) for x in prob_unacc_tox]
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         self._admissable_set = admissable_set
         # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven

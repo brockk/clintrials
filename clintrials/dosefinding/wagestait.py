@@ -149,6 +149,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
                  first_dose, max_size, randomisation_stage_size,
                  F_func=empiric, inverse_F=inverse_empiric,
                  theta_prior=norm(0, np.sqrt(1.34)), beta_prior=norm(0, np.sqrt(1.34)),
+                 excess_toxicity_alpha=0.05, deficient_efficacy_alpha=0.05,
                  model_prior_weights=None, use_quick_integration=False, estimate_var=False):
         """
 
@@ -164,6 +165,9 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         F_func and inverse_F, the link function and inverse for CRM method, e.g. logistic and inverse_logistic
         theta_prior, prior distibution for theta parameter, the single parameter in the efficacy models
         beta_prior, prior distibution for beta parameter, the single parameter in the toxicity CRM model
+        tox_certainty, significance to use when testing that lowest dose exceeds toxicity limit
+        deficient_efficacy_alpha, significance to use when testing that optimal dose has efficacy less than
+                                    efficacy limit
         model_prior_weights, vector of prior probabilities that each model is correct. None to use uniform weights
         use_quick_integration, numerical integration is slow. Set this to False to use the most accurate (slowest)
                                 method; False to use a quick but approximate method.
@@ -189,6 +193,8 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         self.inverse_F = inverse_F
         self.theta_prior = theta_prior
         self.beta_prior = beta_prior
+        self.excess_toxicity_alpha = excess_toxicity_alpha
+        self.deficient_efficacy_alpha = deficient_efficacy_alpha
         if model_prior_weights:
             if self.K != len(model_prior_weights):
                 ValueError('model_prior_weights should have %s items.' % self.K)
@@ -281,13 +287,13 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
             self._next_dose = self._maximise_next_dose(self.post_tox_probs, self.post_eff_probs)
 
         # Stop if lower bound of probability at lowest dose exceeds tox_limit:
-        if self.dose_toxicity_lower_bound(1) > self.tox_limit:
+        if self.dose_toxicity_lower_bound(1, self.excess_toxicity_alpha) > self.tox_limit:
             self._status = -3
             self._next_dose = -1
             self._admissable_set = []
         # Stop if upper bound of efficacy at optimum dose is less than eff_limit
         if self.size() >= self.randomisation_stage_size:
-            if self.dose_efficacy_upper_bound(self._next_dose) < self.eff_limit:
+            if self.dose_efficacy_upper_bound(self._next_dose, self.deficient_efficacy_alpha) < self.eff_limit:
                 self._status = -4
                 self._next_dose = -1
                 self._admissable_set = []

@@ -292,7 +292,7 @@ class CRM(DoseFindingTrial):
         return
 
     def _DoseFindingTrial__calculate_next_dose(self):
-        current_dose = self.next_dose()
+        max_dose_given = self.maximum_dose_given()
         proposed_dose, beta_hat, beta_var = crm(prior=self.prior, target=self.target, toxicities=self._toxicities,
                                                 dose_levels=self._doses, first_dose=self._first_dose,
                                                 F_func=self.F_func, inverse_F=self.inverse_F,
@@ -302,11 +302,11 @@ class CRM(DoseFindingTrial):
         self.beta_hat = beta_hat
         self.beta_var = beta_var
 
-        if self.avoid_escalation_dose_skipping and proposed_dose - current_dose >= 2:
-            # Avoid skipping in escalation by setting proposed dose to current dose + 1
-            proposed_dose = current_dose + 1
+        if self.avoid_escalation_dose_skipping and proposed_dose - max_dose_given >= 2:
+            # Avoid skipping untested doses in escalation by setting proposed dose to max_dose_given + 1
+            proposed_dose = max_dose_given + 1
             # Note: other methods of managing dose escalation are possible!
-            # Maybe we want to only avoid skipping *untried* doses...
+            # Maybe we want to only avoid skipping *untolerated* doses...
 
         # Toxicity at lowest dose
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:

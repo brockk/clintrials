@@ -336,7 +336,8 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.utility = utility
         if sum(admissable) > 0:
             # Select most desirable dose from admissable set
-            ideal_dose = np.arange(1, len(utility)+1)[admissable][np.argmax(utility[admissable])]  # Desirability-based
+            masked_util = np.where(admissable, utility, np.nan)
+            ideal_dose = np.nanargmax(masked_util) + 1
             max_dose_given = self.maximum_dose_given()
             if max_dose_given and ideal_dose - max_dose_given > 1:
                 # Prevent skipping untried doses in escalation

@@ -81,7 +81,7 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
                  F_func=empiric, inverse_F=inverse_empiric,
                  theta_prior=norm(0, np.sqrt(1.34)), beta_prior=norm(0, np.sqrt(1.34)),
                  tox_certainty=0.05, deficient_efficacy_alpha=0.05,
-                 model_prior_weights=None, use_quick_integration=False, estimate_var=True,
+                 model_prior_weights=None, use_quick_integration=True, estimate_var=True,
                  prevent_skipping_untolerated=True, must_try_lowest_dose=True):
         """
 
@@ -225,14 +225,6 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         else:
             self._next_dose = self._stage_two_next_dose(self.post_tox_probs, self.post_eff_probs)
 
-        # Removed code below because the test is better performed in _stage_one_next_dose
-        # and _stage_two_next_dose.
-        # # Stop if lower bound of probability at lowest dose exceeds tox_limit:
-        # if self.dose_toxicity_lower_bound(1, self.tox_certainty) > self.tox_limit:
-        #     self._status = -3
-        #     self._next_dose = -1
-        #     self._admissable_set = []
-
         # Stop if upper bound of efficacy at optimum dose is less than eff_limit
         # TODO: In time, change this rule to use posterior probabilities too, like the way toxicity is
         # tested in _stage_one_next_dose and _stage_two_next_dose.
@@ -266,21 +258,6 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
     # Private interface
-    # def _stage_one_next_dose(self, tox_probs):
-    #     admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
-    #     print tox_probs, admissable
-    #     admissable_set = [i+1 for i, x in enumerate(admissable) if x]
-    #     self._admissable_set = admissable_set
-    #     if sum(admissable) > 0:
-    #         self._status = 1
-    #         self.dose_allocation_mode = 0.5  # TODO
-    #         return self.crm.next_dose()
-    #     else:
-    #         # All doses are too toxic so stop trial
-    #         self._status = -1
-    #         self.dose_allocation_mode = 0
-    #         return -1
-
     def _stage_one_next_dose(self):
         # There is no scrutiny of what is efficable in 'admissable'
         prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)
@@ -296,33 +273,6 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
             self._status = -1
             self.dose_allocation_mode = 0
             return -1
-
-    # def _stage_two_next_dose(self, tox_probs, eff_probs):
-    #     admissable = tox_probs <= self.tox_limit  # There is no scrutiny of what is efficable in 'admissable'
-    #     admissable_set = [i+1 for i, x in enumerate(admissable) if x]
-    #     self._admissable_set = admissable_set
-    #     # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
-    #     # by the equation form that Thall & Cook chose.
-    #     utility = np.array([self.metric(x[0], x[1]) for x in zip(eff_probs, tox_probs)])
-    #     self.utility = utility
-    #     if sum(admissable) > 0:
-    #         # Select most desirable dose from admissable set
-    #         ideal_dose = np.arange(1, len(utility)+1)[admissable][np.argmax(utility[admissable])]  # Desirability-based
-    #         max_dose_given = self.maximum_dose_given()
-    #         if max_dose_given and ideal_dose - max_dose_given > 1:
-    #             # Prevent skipping untried doses in escalation
-    #             self._status = 1
-    #             self.dose_allocation_mode = 2
-    #             return max_dose_given + 1
-    #         else:
-    #             self._status = 1
-    #             self.dose_allocation_mode = 1
-    #             return ideal_dose
-    #     else:
-    #         # All doses are too toxic so stop trial
-    #         self._status = -1
-    #         self.dose_allocation_mode = 0
-    #         return -1
 
     def _stage_two_next_dose(self, tox_probs, eff_probs):
         # There is no scrutiny of what is efficable in 'admissable'

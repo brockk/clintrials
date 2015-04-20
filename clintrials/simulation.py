@@ -60,7 +60,10 @@ def filter_sims(sims, filter):
 
     for key, val in filter.iteritems():
         # In JSON, tuples are masked as lists. In this filter, we treat them as equivalent:
-        sims = [x for x in sims if x[key] == list(val) or x[key] == val]
+        if isinstance(val, (tuple)):
+            sims = [x for x in sims if x[key] == val or x[key] == list(val)]
+        else:
+            sims = [x for x in sims if x[key] == val]
     return sims
 
 
@@ -105,7 +108,7 @@ def summarise_sims(sims, ps, var_map, func_map, to_pandas=True):
             return row_tuples, index_tuples
     else:
         if to_pandas:
-            pd.DataFrame(columns=func_map.keys())
+            return pd.DataFrame(columns=func_map.keys())
         else:
             # TODO
             return [], []

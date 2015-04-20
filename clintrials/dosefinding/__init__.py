@@ -37,6 +37,7 @@ class DoseFindingTrial(object):
     next_dose()
     update(cases)
     has_more()
+    observed_toxicity_rates()
 
     Further internal interface is provided by:
     __reset()
@@ -158,6 +159,18 @@ class DoseFindingTrial(object):
         self.__process_cases(cases)
         self._next_dose = self.__calculate_next_dose()
         return self._next_dose
+
+    def observed_toxicity_rates(self):
+        """ Get the observed rate of toxicity at all doses. """
+        tox_rates = []
+        for d in range(1, self.num_doses+1):
+            num_treated = self.treated_at_dose(d)
+            if num_treated:
+                num_toxes = self.toxicities_at_dose(d)
+                tox_rates.append(1. * num_toxes / num_treated)
+            else:
+                tox_rates.append(np.nan)
+        return np.array(tox_rates)
 
     @abc.abstractmethod
     def __reset(self):
@@ -747,7 +760,9 @@ class EfficacyToxicityDoseFindingTrial(object):
     update(cases)
     has_more()
     admissable_set()
-
+    observed_toxicity_rates()
+    observed_efficacy_rates()
+    
     Further internal interface is provided by:
     __reset()
     __process_cases(cases)
@@ -883,6 +898,30 @@ class EfficacyToxicityDoseFindingTrial(object):
         """ Get the admissable set of doses. """
         return self._admissable_set
 
+    def observed_toxicity_rates(self):
+        """ Get the observed rate of toxicity at all doses. """
+        tox_rates = []
+        for d in range(1, self.num_doses+1):
+            num_treated = self.treated_at_dose(d)
+            if num_treated:
+                num_toxes = self.toxicities_at_dose(d)
+                tox_rates.append(1. * num_toxes / num_treated)
+            else:
+                tox_rates.append(np.nan)
+        return np.array(tox_rates)
+
+    def observed_efficacy_rates(self):
+        """ Get the observed rate of efficacy at all doses. """
+        eff_rates = []
+        for d in range(1, self.num_doses+1):
+            num_treated = self.treated_at_dose(d)
+            if num_treated:
+                num_responses = self.efficacies_at_dose(d)
+                eff_rates.append(1. * num_responses / num_treated)
+            else:
+                eff_rates.append(np.nan)
+        return np.array(eff_rates)    
+    
     @abc.abstractmethod
     def __reset(self):
         """ Opportunity to run implementation-specific reset operations. """

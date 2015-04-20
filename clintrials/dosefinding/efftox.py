@@ -136,6 +136,78 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
         ))
 
     return probs
+    
+    
+def efftox_get_posterior_params(cases, priors, scaled_doses, tox_cutoff, eff_cutoff, n=10**5):
+    """ Get the posterior parameter estimates after having observed cumulative data D in an EffTox trial.
+
+    Note: This function evaluates the posterior integrals using Monte Carlo integration. Thall & Cook
+    use the method of Monahan & Genz. I imagine that is quicker and more accurate but it is also
+    more difficult to program, so I have skipped it. It remains a medium-term aim, however, because
+    this method is slow.
+
+    Params:
+    cases, list of 3-tuples, (dose, toxicity, efficacy), where dose is the given (1-based) dose level,
+                    toxicity = 1 for a toxicity event; 0 for a tolerance event,
+                    efficacy = 1 for an efficacy event; 0 for a non-efficacy event.
+    priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi respectively
+            Each prior object should support obj.ppf(x) and obj.pdf(x)
+    scaled_doses, ordered list of all possible doses where each dose is on Thall & Cook's codified scale (see below),
+    tox_cutoff, the desired maximum toxicity
+    eff_cutoff, the desired minimum efficacy
+    n, number of random points to use in Monte Carlo integration.
+
+    Returns:
+    list of posterior parameters as tuples, [ (mu_T, beta_T, mu_E, beta_T_1, beta_T_2, psi) ], and that's it for now.
+            i.e. returned obj is of length 1 and first interior tuple is of length 6.
+            More objects might be added to the outer list eventually.
+
+    Note: Thall & Cook's codified dose scale is thus:
+    If doses 10mg, 20mg and 25mg are given so that d = [10, 20, 25], then the codified doses, x, are
+    x = ln(d) - mean(ln(dose)) = [-0.5365, 0.1567, 0.3798]
+
+    """
+
+    if len(priors) != 6:
+        raise ValueError('priors should have 6 items.')
+
+    # Convert dose-levels given to dose amounts given
+    if len(cases) > 0:
+        dose_levels, tox_events, eff_events = zip(*cases)
+        scaled_doses_given = [scaled_doses[x-1] for x in dose_levels]
+        _cases = zip(scaled_doses_given, tox_events, eff_events)
+    else:
+        _cases = []
+
+    # The ranges of integration must be specified. In truth, the integration range is (-Infinity, Infinity)
+    # for each variable. In practice, though, integrating to infinity is problematic, especially in
+    # 6 dimensions. The limits of integration should capture all probability density, but not be too
+    # generous, e.g. -1000 to 1000 would be stupid because the density at most points would be practically zero.
+    # I use percentage points of the various prior distributions. The risk is that if the prior
+    # does not cover the posterior range well, it will not estimate it well. This needs attention. TODO
+    epsilon = 0.0001
+    limits = [(dist.ppf(epsilon), dist.ppf(1-epsilon)) for dist in priors]
+    samp = np.column_stack([np.random.uniform(*limit_pair, size=n) for limit_pair in limits])
+
+    lik_integrand = lambda x: _L_n(_cases, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
+                              * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
+                              * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
+    lik = lik_integrand(samp)
+    scale = lik.mean()
+
+    params = []
+    params.append(
+    	(
+        	np.mean(samp[:, 0] * lik / scale),
+	        np.mean(samp[:, 1] * lik / scale),
+	        np.mean(samp[:, 2] * lik / scale),
+	        np.mean(samp[:, 3] * lik / scale),
+	        np.mean(samp[:, 4] * lik / scale),
+	        np.mean(samp[:, 5] * lik / scale),
+    	)
+    )
+
+    return params
 
 
 # Desirability metrics
@@ -388,27 +460,10 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.utility = utility
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
-        # cases = zip(self._doses, self._toxicities, self._efficacies)
-        # post_probs = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
-        #                                         self.eff_cutoff, n)
-        # prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)
-        # admissable = np.array([x >= self.tox_certainty and y >= self.eff_certainty
-        #                        for x, y in zip(prob_acc_tox, prob_acc_eff)])
-        # admissable_set = [i+1 for i, x in enumerate(admissable) if x]
-        # # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
-        # # by the equation form that Thall & Cook chose.
-        # utility = np.array([self.metric(x[0], x[1]) for x in zip(prob_eff, prob_tox)])
-        # self.prob_tox = prob_tox
-        # self.prob_eff = prob_eff
-        # self.prob_acc_tox = prob_acc_tox
-        # self.prob_acc_eff = prob_acc_eff
-        # self._admissable_set = admissable_set
-        # self.utility = utility
         self._update_integrals(n)
         dose_is_admissable = np.array([x in self._admissable_set for x in range(1, self.num_doses+1)])
         if sum(dose_is_admissable) > 0:
             # Select most desirable dose from admissable set, based on utility
-            # ideal_dose = np.arange(1, len(self.utility)+1)[admissable][np.argmax(self.utility[admissable])]
             masked_utility = np.where(dose_is_admissable, self.utility, np.nan)
             ideal_dose = np.nanargmax(masked_utility) + 1
             max_dose_given = self.maximum_dose_given()
@@ -462,6 +517,12 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
+    
+    def posterior_params(self, n=10**5):
+    	""" Get posterior parameter estimates """
+    	cases = zip(self._doses, self._toxicities, self._efficacies)
+    	return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff,
+                                           self.eff_cutoff, n)
 
 
 def efftox_sim(n_patients, true_toxicities, true_efficacies, first_dose,
@@ -585,13 +646,14 @@ def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff
 
 
     Metrizable means that the priority of doses can be calculated using a metric.
-    A dose is admissable if it has probability of toxicity less than some cutoff; and
+    A dose is conformative if it has probability of toxicity less than some cutoff; and
     probability of efficacy greater than some cutoff.
-    The OBD is the dose with the highest utility in the admissable set. The OBD does not
+    The OBD is the dose with the highest utility in the conformative set. The OBD does not
     necessarily have a positive utility.
 
-    This function returns, as a 5-tuple, (an array representing the admissable set, an array of utlities,
-    the utility of the optimal dose, the 1-based OBD level, the utility distance from the next most preferable dose)
+    This function returns, as a 5-tuple, (an array of bools representing whether each dose is conformative, the array
+    of utlities, the utility of the optimal dose, the 1-based OBD level, and the utility distance from the OBD to the
+    next most preferable dose in the conformative set where there are several conformative doses)
 
     :param prob_tox: Probabilities of toxicity at each dose
     :type prob_tox: iterable
@@ -609,17 +671,17 @@ def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff
         raise Exception('prob_tox and prob_eff should be lists or tuples of the same length.')
     t = prob_tox
     r = prob_eff
-    admiss = np.array([(eff > eff_cutoff) and (tox < tox_cutoff) for eff, tox in zip(r, t)])
+    conform = np.array([(eff > eff_cutoff) and (tox < tox_cutoff) for eff, tox in zip(r, t)])
     util = np.array([metric(eff, tox) for eff, tox in zip(r, t)])
-    admissable_util = np.where(admiss, util, -np.inf)
-    if sum(admiss) >= 2:
-        obd = np.nanargmax(admissable_util)+1
-        u2, u1 = np.sort(admissable_util)[-2:]
+    conform_util = np.where(conform, util, -np.inf)
+    if sum(conform) >= 2:
+        obd = np.nanargmax(conform_util)+1
+        u2, u1 = np.sort(conform_util)[-2:]
         u_cushion = u1 - u2
-        return admiss, util, u1, obd, u_cushion
-    elif sum(admiss) >= 1:
-        obd = np.nanargmax(admissable_util)+1
-        u1 = np.nanmax(admissable_util)
-        return admiss, util, u1, obd, np.nan
+        return conform, util, u1, obd, u_cushion
+    elif sum(conform) >= 1:
+        obd = np.nanargmax(conform_util)+1
+        u1 = np.nanmax(conform_util)
+        return conform, util, u1, obd, np.nan
     else:
-        return admiss, util, max(util), -1, np.nan
+        return conform, util, np.nan, -1, np.nan

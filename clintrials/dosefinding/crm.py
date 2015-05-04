@@ -354,3 +354,19 @@ class CRM(DoseFindingTrial):
         else:
             return True
 
+    def optimal_decision(self, prob_tox):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity curve.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        return np.argmin(np.abs(prob_tox - self.target)) + 1
+

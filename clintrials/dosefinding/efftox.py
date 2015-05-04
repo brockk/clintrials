@@ -524,6 +524,26 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     	return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                            self.eff_cutoff, n)
 
+    def optimal_decision(self, prob_tox, prob_eff):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity and efficacy curves.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :param prob_tox: collection of efficacy probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        admiss, u, u_star, obd, u_cushtion = solve_metrizable_efftox_scenario(prob_tox, prob_eff, self.metric,
+                                                                              self.tox_cutoff, self.eff_cutoff)
+        return obd
+
 
 def efftox_sim(n_patients, true_toxicities, true_efficacies, first_dose,
                real_doses, theta_priors, tox_cutoff, eff_cutoff, tox_certainty, eff_certainty,

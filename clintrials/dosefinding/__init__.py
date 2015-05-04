@@ -38,6 +38,7 @@ class DoseFindingTrial(object):
     update(cases)
     has_more()
     observed_toxicity_rates()
+    optimal_decision(prob_tox)
 
     Further internal interface is provided by:
     __reset()
@@ -171,6 +172,22 @@ class DoseFindingTrial(object):
             else:
                 tox_rates.append(np.nan)
         return np.array(tox_rates)
+
+    def optimal_decision(self, prob_tox):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity curve.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def __reset(self):
@@ -492,67 +509,100 @@ class ThreePlusThree(DoseFindingTrial):
         return DoseFindingTrial.has_more(self) and self._continue
 
 
-def simulate_dose_finding_trial(design, true_toxicities, tolerances=None, cohort_size=1, to_json=0):
-    """ Simulate a dose finding trial based on toxicity, like CRM, 3+3, etc.
+def simulate_dose_finding_trial(design, true_toxicities, tolerances=None, cohort_size=1,
+                                conduct_trial=1, calculate_optimal_decision=1):
+    """ Simulate a dose finding trial based on observed bivariate toxicity, like CRM, 3+3, etc.
 
     Params:
-    design, an instance of DoseFindingTrial
-    true_toxicities, list of the true toxicity rates at the dose levels under investigation.
-                    Obviously these are unknown in real-life but we use them in simulations to test the algorithm.
-                    Should be same length as prior.
-    tolerances, list of tolerances. Patient experiences toxicity if their tolerance is less than the probability
-                    of toxicity at the dose they received. Leave None to get random uniform tolerances.
-    cohort_size, to add several patients at once
-    to_json, True to get result returned as JSON-friendly object
+    :param design: the design with which to simulate a dose-finding trial.
+    :type design: clintrials.dosefinding.DoseFindingTrial
+    :param true_toxicities: list of the true toxicity rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_toxicities: list
+    :param tolerances: optional n_patients list or array of uniforms used to infer toxicity events for patients.
+                        Leave None to get randomly sampled data.
+                        This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
+    :type tolerances: list
+    :param cohort_size: to add several patients at a dose at once
+    :type cohort_size: int
+    :param conduct_trial: True to conduct cohort-by-cohort dosing using the trial design; False to suppress
+    :type conduct_trial: bool
+    :param calculate_optimal_decision: True to calculate the optimal dose; False to suppress
+    :type calculate_optimal_decision: bool
 
-    Returns, if to_json, a dict-like
-             else, a 2-tuple: (dose selected, dictionary of Tox, Dose and Tol data)
+    :return: report of the simulation outcome as a JSON-able dict
+    :rtype: dict
 
     """
 
+    # Validate inputs
     if tolerances is None:
         tolerances = uniform().rvs(design.max_size())
     else:
         if len(tolerances) < design.max_size():
             logging.warn('You have provided fewer tolerances than maximum number of patients on trial. Beware errors!')
 
-    i = 0
-    design.reset()
-    dose_level = design.next_dose()
-    while i <= design.max_size() and design.has_more():
-        tox = [1 if x < true_toxicities[dose_level-1] else 0 for x in tolerances[i:i+cohort_size]]
-        cases = zip([dose_level] * cohort_size, tox)
-        dose_level = design.update(cases)
-        i += cohort_size
+    # Simulate trial
+    if conduct_trial:
+        i = 0
+        design.reset()
+        dose_level = design.next_dose()
+        while i <= design.max_size() and design.has_more():
+            tox = [1 if x < true_toxicities[dose_level-1] else 0 for x in tolerances[i:i+cohort_size]]
+            cases = zip([dose_level] * cohort_size, tox)
+            dose_level = design.update(cases)
+            i += cohort_size
 
-    if to_json:
-        report = OrderedDict()
-        report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    # Report findings
+    report = OrderedDict()
+    report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    if conduct_trial:
         report['RecommendedDose'] = atomic_to_json(design.next_dose())
         report['TrialStatus'] = atomic_to_json(design.status())
         report['Doses'] = iterable_to_json(design.doses())
         report['Toxicities'] = iterable_to_json(design.toxicities())
-        return report
-    else:
-        sim = {'Tox': design.toxicities(), 'Dose': design.doses(), 'Tol': tolerances}
-        return design.next_dose(), sim
+    # Optimal decision, given these specific patient tolerances
+    if calculate_optimal_decision:
+        try:
+            had_tox = lambda x: x < np.array(true_toxicities)
+            tox_horizons = np.array([had_tox(x) for x in tolerances])
+            tox_hat = tox_horizons.mean(axis=0)
+
+            optimal_allocation = design.optimal_decision(tox_hat)
+            report['FullyInformedToxicityCurve'] = iterable_to_json(tox_hat)
+            report['OptimalAllocation'] = atomic_to_json(optimal_allocation)
+        except NotImplementedError:
+            pass
+
+    return report
 
 
-def simulate_dose_finding_trials(design_map, true_toxicities, tolerances=None, cohort_size=1):
+def simulate_dose_finding_trials(design_map, true_toxicities, tolerances=None, cohort_size=1,
+                                 conduct_trial=1, calculate_optimal_decision=1):
     """ Simulate multiple toxicity-driven dose finding trials (like CRM, 3+3, etc) from the same patient data.
 
     This method lets you see how different designs handle a single common set of patient outcomes.
 
-    Params:
-    design_map, dict, label -> instance of DoseFindingTrial
-    true_toxicities, list of the true toxicity rates. Obviously these are unknown in real-life but
-                    we use them in simulations to test the algorithm. Should be same length as prior.
-    tolerances, list of tolerances. Leave None to get random tolerances.
-    cohort_size, to add several patients at once
-    to_json, True to get result returned as JSON-friendly object
+    :param design_map: dict, label -> instance of DoseFindingTrial
+    :type design_map: dict
+    :param true_toxicities: list of the true toxicity rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_toxicities: list
+    :param tolerances: optional n_patients list or array of uniforms used to infer toxicity events for patients.
+                        Leave None to get randomly sampled data.
+                        This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
+    :type tolerances: list
+    :param cohort_size: to add several patients at a dose at once
+    :type cohort_size: int
+    :param conduct_trial: True to conduct cohort-by-cohort dosing using the trial design; False to suppress
+    :type conduct_trial: bool
+    :param calculate_optimal_decision: True to calculate the optimal dose; False to suppress
+    :type calculate_optimal_decision: bool
 
-    Returns, if to_json, a dict-like
-             else, a 2-tuple: (dose selected, dictionary of Tox, Dose and Tol data)
+    :return: report of the simulation outcome as a JSON-able dict
+    :rtype: dict
 
     """
 
@@ -564,12 +614,73 @@ def simulate_dose_finding_trials(design_map, true_toxicities, tolerances=None, c
             logging.warn('You have provided fewer tolerances than maximum number of patients on trial. Beware errors!')
 
     report = OrderedDict()
-    report['TrueToxicities'] = true_toxicities
+    report['TrueToxicities'] = iterable_to_json(true_toxicities)
     for label, design in design_map.iteritems():
         design_sim = simulate_dose_finding_trial(design, true_toxicities, tolerances=tolerances,
-                                                 cohort_size=cohort_size, to_json=1)
+                                                 cohort_size=cohort_size, conduct_trial=conduct_trial,
+                                                 calculate_optimal_decision=calculate_optimal_decision)
         report[label] = design_sim
     return report
+
+
+def find_mtd(toxicity_target, scenario, strictly_lte=False, verbose=False):
+    """ Find the MTD in a list of toxicity probabilities and a target toxicity rate.
+
+    :param toxicity_target: target probability of toxicity
+    :type toxicity_target: float
+    :param scenario: list of probabilities of toxicity at each dose
+    :type scenario: list
+    :param strictly_lte: True to demand that Prob(toxicity) at MD is <= toxicity_target;
+                         False to allow it to be over if it is near.
+    :type strictly_lte: bool
+    :param verbose: True to print output
+    :type verbose: bool
+    :return: 1-based location of MTD
+    :rtype: int
+
+    For example,
+
+    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=0)
+    2
+    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=1)
+    2
+    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=0)
+    1
+    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=1)
+    0
+    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=0)
+    3
+    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=1)
+    2
+
+    """
+
+    if toxicity_target in scenario:
+        # Return exact match
+        loc = scenario.index(toxicity_target) + 1
+        if verbose:
+            print 'MTD is', loc
+        return loc
+    else:
+        if strictly_lte:
+            if sum(np.array(scenario) <= toxicity_target) == 0:
+                # Infeasible scenario
+                if verbose:
+                    print 'All doses are too toxic'
+                return 0
+            else:
+                # Return highest tox no greater than target
+                objective = np.where(np.array(scenario)<=toxicity_target, toxicity_target-np.array(scenario), np.inf)
+                loc = np.argmin(objective) + 1
+                if verbose:
+                    print 'Highest dose below MTD is', loc
+                return loc
+        else:
+            # Return nearest
+            loc = np.argmin(np.abs(np.array(scenario) - toxicity_target)) + 1
+            if verbose:
+                print 'Dose nearest to MTD is', loc
+            return loc
 
 
 def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
@@ -762,6 +873,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     admissable_set()
     observed_toxicity_rates()
     observed_efficacy_rates()
+    optimal_decision(prob_tox, prob_eff)
     
     Further internal interface is provided by:
     __reset()
@@ -920,7 +1032,25 @@ class EfficacyToxicityDoseFindingTrial(object):
                 eff_rates.append(1. * num_responses / num_treated)
             else:
                 eff_rates.append(np.nan)
-        return np.array(eff_rates)    
+        return np.array(eff_rates)
+
+    def optimal_decision(self, prob_tox, prob_eff):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity and efficacy curves.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :param prob_tox: collection of efficacy probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        raise NotImplementedError()
     
     @abc.abstractmethod
     def __reset(self):
@@ -943,33 +1073,134 @@ class EfficacyToxicityDoseFindingTrial(object):
         return -1  # Default implementation
 
 
-def simulate_efficacy_toxicity_dose_finding_trial(design, true_toxicities, true_efficacies,
-                                                  tox_eff_odds_ratio=1.0, tolerances=None, cohort_size=1,
-                                                  to_json=0):
+def _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_odds_ratio=1.0, tolerances=None,
+                            cohort_size=1, conduct_trial=1, calculate_optimal_decision=1):
     """ Simulate a dose finding trial based on efficacy and toxicity, like EffTox, etc.
 
-    Params:
-    design, an instance of EfficacyToxicityDoseFindingTrial
-    true_toxicities, list of the true toxicity rates at the dose levels under investigation.
-                     Obviously these are unknown in real-life but we use them in simulations to test the algorithm.
-                     Should be same length as prior.
-    true_efficacies, list of the true efficacy rates at the dose levels under investigation.
-                     Obviously these are unknown in real-life but we use them in simulations to test the algorithm.
-                     Should be same length as prior.
-    tox_eff_odds_ratio, odds ratio of toxicity and efficacy events. Use 1. for no association
-    tolerances, optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
+    :param design: the design with which to simulate a dose-finding trial.
+    :type design: clintrials.dosefinding.EfficacyToxicityDoseFindingTrial
+    :param true_toxicities: list of the true toxicity rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_toxicities: list
+    :param true_efficacies: list of the true efficacy rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_efficacies: list
+    :param tox_eff_odds_ratio: odds ratio of toxicity and efficacy events. Use 1. for no association
+    :type tox_eff_odds_ratio: float
+    :param tolerances: optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
                         for patients. This array is passed to function that calculates correlated binary events from
                         uniform variables and marginal probabilities.
                         Leave None to get randomly sampled data.
                         This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
-    cohort_size, to add several patients at once
-    to_json, True to get result returned as JSON-friendly object
+    :type tolerances: numpy.array
+    :param cohort_size: to add several patients at a dose at once
+    :type cohort_size: int
+    :param conduct_trial: True to conduct cohort-by-cohort dosing using the trial design; False to suppress
+    :type conduct_trial: bool
+    :param calculate_optimal_decision: True to calculate the optimal dose; False to suppress
+    :type calculate_optimal_decision: bool
 
-    Returns, if to_json, a dict-like
-             else, a 2-tuple: (dose selected, dictionary of Tox, Dose and Tol data)
+    :return: report of the simulation outcome as a JSON-able dict
+    :rtype: dict
 
     """
 
+    correlated_outcomes = tox_eff_odds_ratio < 1.0 or tox_eff_odds_ratio > 1.0
+
+    # Simulate trial
+    if conduct_trial:
+        i = 0
+        design.reset()
+        dose_level = design.next_dose()
+        while i <= design.max_size() and design.has_more():
+            u = (true_toxicities[dose_level-1], true_efficacies[dose_level-1])
+            if correlated_outcomes:
+                # Where outcomes are associated, simulated outcomes must reflect the association.
+                # There is a special method for that:
+                events = correlated_binary_outcomes_from_uniforms(tolerances[i:i+cohort_size, ], u,
+                                                                  psi=tox_eff_odds_ratio).astype(int)
+            else:
+                # Outcomes are not associated. Simply use first two columns of tolerances as
+                # uniformally-distributed thresholds for tox and eff. The third col is ignored.
+                events = (tolerances[i:i+cohort_size, 0:2] < u).astype(int)
+            cases = np.column_stack(([dose_level] * cohort_size, events))
+            dose_level = design.update(cases)
+            i += cohort_size
+
+    # Report findings
+    report = OrderedDict()
+    report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    report['TrueEfficacies'] = iterable_to_json(true_efficacies)
+    if conduct_trial:
+        report['RecommendedDose'] = atomic_to_json(design.next_dose())
+        report['TrialStatus'] = atomic_to_json(design.status())
+        report['Doses'] = iterable_to_json(design.doses())
+        report['Toxicities'] = iterable_to_json(design.toxicities())
+        report['Efficacies'] = iterable_to_json(design.efficacies())
+    # Optimal decision, given these specific patient tolerances
+    if calculate_optimal_decision:
+        try:
+            if correlated_outcomes:
+                tox_eff_hat = np.array([
+                    correlated_binary_outcomes_from_uniforms(tolerances, v, psi=tox_eff_odds_ratio).mean(axis=0)
+                    for v in zip(true_toxicities, true_efficacies)])
+                tox_hat, eff_hat = tox_eff_hat[:, 0], tox_eff_hat[:, 1]
+            else:
+                had_tox = lambda x: x < np.array(true_toxicities)
+                tox_horizons = np.array([had_tox(x) for x in tolerances[:, 0]])
+                tox_hat = tox_horizons.mean(axis=0)
+                had_eff = lambda x: x < np.array(true_efficacies)
+                eff_horizons = np.array([had_eff(x) for x in tolerances[:, 1]])
+                eff_hat = eff_horizons.mean(axis=0)
+
+            optimal_allocation = design.optimal_decision(tox_hat, eff_hat)
+            report['FullyInformedToxicityCurve'] = iterable_to_json(tox_hat)
+            report['FullyInformedEfficacyCurve'] = iterable_to_json(eff_hat)
+            report['OptimalAllocation'] = atomic_to_json(optimal_allocation)
+        except NotImplementedError:
+            pass
+
+    return report
+
+
+def simulate_efficacy_toxicity_dose_finding_trial(design, true_toxicities, true_efficacies,
+                                                  tox_eff_odds_ratio=1.0, tolerances=None, cohort_size=1,
+                                                  conduct_trial=1, calculate_optimal_decision=1):
+    """ Simulate a dose finding trial based on efficacy and toxicity, like EffTox, etc.
+
+    :param design: the design with which to simulate a dose-finding trial.
+    :type design: clintrials.dosefinding.EfficacyToxicityDoseFindingTrial
+    :param true_toxicities: list of the true toxicity rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_toxicities: list
+    :param true_efficacies: list of the true efficacy rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_efficacies: list
+    :param tox_eff_odds_ratio: odds ratio of toxicity and efficacy events. Use 1. for no association
+    :type tox_eff_odds_ratio: float
+    :param tolerances: optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
+                        for patients. This array is passed to function that calculates correlated binary events from
+                        uniform variables and marginal probabilities.
+                        Leave None to get randomly sampled data.
+                        This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
+    :type tolerances: numpy.array
+    :param cohort_size: to add several patients at a dose at once
+    :type cohort_size: int
+    :param conduct_trial: True to conduct cohort-by-cohort dosing using the trial design; False to suppress
+    :type conduct_trial: bool
+    :param calculate_optimal_decision: True to calculate the optimal dose; False to suppress
+    :type calculate_optimal_decision: bool
+
+    :return: report of the simulation outcome as a JSON-able dict
+    :rtype: dict
+
+    """
+
+    # Validation and derivation of the inputs
     if len(true_efficacies) != len(true_toxicities):
         raise ValueError('true_efficacies and true_toxicities should be same length.')
     if len(true_toxicities) != design.number_of_doses():
@@ -981,57 +1212,50 @@ def simulate_efficacy_toxicity_dose_finding_trial(design, true_toxicities, true_
     else:
         tolerances = np.random.uniform(size=3*n_patients).reshape(n_patients, 3)
 
-    i = 0
-    design.reset()
-    dose_level = design.next_dose()
-    while i <= design.max_size() and design.has_more():
-        u = (true_toxicities[dose_level-1], true_efficacies[dose_level-1])
-        events = correlated_binary_outcomes_from_uniforms(tolerances[i:i+cohort_size, ], u,
-                                                          psi=tox_eff_odds_ratio).astype(int)
-        cases = np.column_stack(([dose_level] * cohort_size, events))
-        dose_level = design.update(cases)
-        i += cohort_size
+    if tox_eff_odds_ratio != 1.0 and calculate_optimal_decision:
+        logging.warn('Patient outcomes are not sequential when toxicity and efficacy events are correlated. ' +
+                     'E.g. toxicity at d_1 dose not necessarily imply toxicity at d_2. It is important ' +
+                     'to appreciate this when calculating optimal decisions.')
 
-    if to_json:
-        report = OrderedDict()
-        report['TrueToxicities'] = iterable_to_json(true_toxicities)
-        report['TrueEfficacies'] = iterable_to_json(true_efficacies)
-        report['RecommendedDose'] = atomic_to_json(design.next_dose())
-        report['TrialStatus'] = atomic_to_json(design.status())
-        report['Doses'] = iterable_to_json(design.doses())
-        report['Toxicities'] = iterable_to_json(design.toxicities())
-        report['Efficacies'] = iterable_to_json(design.efficacies())
-        return report
-    else:
-        sim = {'Dose': design.doses(), 'Tox': design.toxicities(), 'Eff': design.efficacies(), 'Tol': tolerances}
-        return design.next_dose(), sim
+    return _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_odds_ratio, tolerances,
+                                   cohort_size, conduct_trial, calculate_optimal_decision)
 
 
 def simulate_efficacy_toxicity_dose_finding_trials(design_map, true_toxicities, true_efficacies,
-                                                   tox_eff_odds_ratio=1.0, tolerances=None, cohort_size=1):
+                                                   tox_eff_odds_ratio=1.0, tolerances=None, cohort_size=1,
+                                                   conduct_trial=1, calculate_optimal_decision=1):
     """ Simulate multiple dose finding trials based on efficacy and toxicity, like EffTox, etc.
 
     This method lets you see how different designs handle a single common set of patient outcomes.
 
-    Params:
-    design_map, dict, label -> instance of EfficacyToxicityDoseFindingTrial
-    true_toxicities, list of the true toxicity rates at the dose levels under investigation.
-                     Obviously these are unknown in real-life but we use them in simulations to test the algorithm.
-                     Should be same length as prior.
-    true_efficacies, list of the true efficacy rates at the dose levels under investigation.
-                     Obviously these are unknown in real-life but we use them in simulations to test the algorithm.
-                     Should be same length as prior.
-    tox_eff_odds_ratio, odds ratio of toxicity and efficacy events. Use 1. for no association
-    tolerances, optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
+    :param design_map: dict, label -> instance of EfficacyToxicityDoseFindingTrial
+    :type design_map: dict
+    :param true_toxicities: list of the true toxicity rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_toxicities: list
+    :param true_efficacies: list of the true efficacy rates at the dose levels under investigation.
+                            In real life, these are unknown but we use them in simulations to test the algorithm.
+                            Should be same length as prior.
+    :type true_efficacies: list
+    :param tox_eff_odds_ratio: odds ratio of toxicity and efficacy events. Use 1. for no association
+    :type tox_eff_odds_ratio: float
+    :param tolerances: optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
                         for patients. This array is passed to function that calculates correlated binary events from
                         uniform variables and marginal probabilities.
                         Leave None to get randomly sampled data.
                         This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
-    cohort_size, to add several patients at once
-    to_json, True to get result returned as JSON-friendly object
+    :type tolerances: numpy.array
+    :param cohort_size: to add several patients at a dose at once
+    :type cohort_size: int
+    :param conduct_trial: True to conduct cohort-by-cohort dosing using the trial design; False to suppress
+    :type conduct_trial: bool
+    :param calculate_optimal_decision: True to calculate the optimal dose; False to suppress
+    :type calculate_optimal_decision: bool
 
-    Returns, if to_json, a dict-like
-             else, a 2-tuple: (dose selected, dictionary of Tox, Dose and Tol data)
+    :return: report of the simulation outcomes as a JSON-able dict. The outcome for each design is encased in its own
+                map, keyed by the name (i.e. the key) in design_map.
+    :rtype: dict
 
     """
 
@@ -1042,73 +1266,17 @@ def simulate_efficacy_toxicity_dose_finding_trials(design_map, true_toxicities, 
     else:
         tolerances = np.random.uniform(size=3*max_size).reshape(max_size, 3)
 
+    if tox_eff_odds_ratio != 1.0 and calculate_optimal_decision:
+        logging.warn('Patient outcomes are not sequential when toxicity and efficacy events are correlated. ' +
+                     'E.g. toxicity at d_1 dose not necessarily imply toxicity at d_2. It is important ' +
+                     'to appreciate this when calculating optimal decisions.')
+
     report = OrderedDict()
-    report['TrueToxicities'] = true_toxicities
-    report['TrueEfficacies'] = true_efficacies
+    report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    report['TrueEfficacies'] = iterable_to_json(true_efficacies)
     for label, design in design_map.iteritems():
-        design_sim = simulate_efficacy_toxicity_dose_finding_trial(design, true_toxicities, true_efficacies,
-                                                                   tox_eff_odds_ratio, tolerances=tolerances,
-                                                                   cohort_size=cohort_size, to_json=1)
-        report[label] = design_sim
+        this_sim = _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_odds_ratio, tolerances,
+                                           cohort_size, conduct_trial, calculate_optimal_decision)
+        report[label] = this_sim
+
     return report
-
-
-def find_mtd(toxicity_target, scenario, strictly_lte=False, verbose=False):
-    """ Find the MTD in a list of toxicity probabilities and a target toxicity rate.
-
-    :param toxicity_target: target probability of toxicity
-    :type toxicity_target: float
-    :param scenario: list of probabilities of toxicity at each dose
-    :type scenario: list
-    :param strictly_lte: True to demand that Prob(toxicity) at MD is <= toxicity_target;
-                         False to allow it to be over if it is near.
-    :type strictly_lte: bool
-    :param verbose: True to print output
-    :type verbose: bool
-    :return: 1-based location of MTD
-    :rtype: int
-
-    For example,
-
-    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=0)
-    2
-    >>> find_mtd(0.25, [0.15, 0.25, 0.35], strictly_lte=1)
-    2
-    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=0)
-    1
-    >>> find_mtd(0.25, [0.3, 0.4, 0.5], strictly_lte=1)
-    0
-    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=0)
-    3
-    >>> find_mtd(0.25, [0.20, 0.22, 0.26], strictly_lte=1)
-    2
-
-    """
-
-    if toxicity_target in scenario:
-        # Return exact match
-        loc = scenario.index(toxicity_target) + 1
-        if verbose:
-            print 'MTD is', loc
-        return loc
-    else:
-        if strictly_lte:
-            if sum(np.array(scenario) <= toxicity_target) == 0:
-                # Infeasible scenario
-                if verbose:
-                    print 'All doses are too toxic'
-                return 0
-            else:
-                # Return highest tox no greater than target
-                objective = np.where(np.array(scenario)<=toxicity_target, toxicity_target-np.array(scenario), np.inf)
-                loc = np.argmin(objective) + 1
-                if verbose:
-                    print 'Highest dose below MTD is', loc
-                return loc
-        else:
-            # Return nearest
-            loc = np.argmin(np.abs(np.array(scenario) - toxicity_target)) + 1
-            if verbose:
-                print 'Dose nearest to MTD is', loc
-            return loc
-

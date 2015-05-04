@@ -23,6 +23,7 @@ from random import sample
 from clintrials.common import empiric, inverse_empiric
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
 from clintrials.dosefinding.crm import CRM
+from clintrials.dosefinding.efftox import solve_metrizable_efftox_scenario
 from clintrials.dosefinding.wagestait import wt_get_theta_hat
 from clintrials.util import correlated_binary_outcomes_from_uniforms
 
@@ -257,6 +258,26 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
+    def optimal_decision(self, prob_tox, prob_eff):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity and efficacy curves.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :param prob_tox: collection of efficacy probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        admiss, u, u_star, obd, u_cushtion = solve_metrizable_efftox_scenario(prob_tox, prob_eff, self.metric,
+                                                                              self.tox_limit, self.eff_limit)
+        return obd
+
     # Private interface
     def _stage_one_next_dose(self):
         # There is no scrutiny of what is efficable in 'admissable'
@@ -303,6 +324,7 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
             self._status = -1
             self.dose_allocation_mode = 0
             return -1
+
 
 
 def brock_yap_sim(n_patients, true_toxicities, true_efficacies,

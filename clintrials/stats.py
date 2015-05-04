@@ -21,6 +21,7 @@ def bootstrap(x):
 
     return np.random.choice(x, size=len(x), replace=1)
 
+
 def density(x, n_points=100, covariance_factor=0.25):
     """ Calculate and plot approximate densoty function from a sample.
 
@@ -41,3 +42,24 @@ def density(x, n_points=100, covariance_factor=0.25):
     d._compute_covariance()
     plt.plot(xs, d(xs))
     plt.show()
+
+
+def beta_like_normal(mu, sigma):
+    """ If X ~ N(mu, sigma^2), get alpha and beta s.t. Y ~ Beta(alpha, beta) has:
+        E[X] = E[Y] & Var[X] = Var[Y]
+
+        This is useful for quickly estimating the effective sample size of a normal prior,
+        using the principle that the effective sample size of Beta(a, b) is a+b.
+
+    :param mu: Mean of a normal r.v.
+    :type mu: float
+    :param sigma: Standard deviation of a normal r.v.
+    :type sigma: float
+    :return: (alpha, beta) pair of floats
+    :rtype: tuple
+
+    """
+
+    alpha = (mu/sigma)**2 * (1-mu) - mu
+    beta = ((1-mu)/mu) * alpha
+    return alpha, beta

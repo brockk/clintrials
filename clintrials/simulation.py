@@ -67,7 +67,7 @@ def filter_sims(sims, filter):
     return sims
 
 
-def summarise_sims(sims, ps, var_map, func_map, to_pandas=True):
+def summarise_sims(sims, ps, func_map, var_map=None, to_pandas=True):
     """ Summarise a list of simulations.
 
     Method partitions simulations into subsets that used the same set of parameters, and then invokes
@@ -87,7 +87,14 @@ def summarise_sims(sims, ps, var_map, func_map, to_pandas=True):
 
     """
 
-    var_names = var_map.keys()
+    if var_map is None:
+        var_names = ps.keys()
+        var_map = {}
+        for var_name in var_names:
+            var_map[var_name] = var_name
+    else:
+        var_names = var_map.keys()
+
     z = [(var_name, ps[var_map[var_name]]) for var_name in var_names]
     labels, val_arrays = zip(*z)
     param_combinations = list(itertools.product(*val_arrays))

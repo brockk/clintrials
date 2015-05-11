@@ -510,7 +510,7 @@ class ParameterSpace:
     """ Class to handle combinations of parameters (i.e. a parameter space) in simulations. """
 
     def __init__(self):
-        self.vals_map = {}
+        self.vals_map = OrderedDict()
 
     def add(self, label, values):
         """ Add a variable and a list of all values the variable may take.

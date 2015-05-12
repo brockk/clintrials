@@ -16,7 +16,7 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 
 
 import numpy as np
-import pandas as pd
+# import pandas as pd
 from scipy.stats import norm, beta
 from random import sample
 
@@ -433,6 +433,7 @@ def brock_yap_sim(n_patients, true_toxicities, true_efficacies,
         trial_outcome = 100
         i += cohort_size
 
+    import pandas as pd
     trial_data = pd.DataFrame({'Tox': trial.toxicities(), 'Eff': trial.efficacies(),
                                'Dose': trial.doses(),
                                'ModelChoice': model_choices, 'Phase': phases,

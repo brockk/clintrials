@@ -10,7 +10,7 @@ from collections import OrderedDict
 from itertools import product, combinations_with_replacement
 import logging
 import numpy as np
-import pandas as pd
+# import pandas as pd
 from scipy.stats import uniform
 
 from clintrials.util import (atomic_to_json, iterable_to_json,
@@ -702,6 +702,8 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
         This function is a bit of a mess but it is useful. Use methods in clintrials.simulation instead.
 
     """
+
+    import pandas as pd
 
     # Quick and dirty filter
     if len(filter):

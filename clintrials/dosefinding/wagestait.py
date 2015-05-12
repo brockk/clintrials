@@ -11,7 +11,7 @@ Wages, N.A. and Tait, C. (2014?). Seamless Phase I/II Adaptive Design For Oncolo
 
 
 import numpy as np
-import pandas as pd
+# import pandas as pd
 from scipy.stats import norm, beta
 from scipy.integrate import quad, trapz
 from random import sample
@@ -483,6 +483,7 @@ def wages_tait_sim(n_patients, true_toxicities, true_efficacies,
         trial_outcome = 100
         i += cohort_size
 
+    import pandas as pd
     trial_data = pd.DataFrame({'Tox': trial.toxicities(), 'Eff': trial.efficacies(),
                                'Dose': trial.doses(),
                                'ModelChoice': model_choices, 'Phase': phases,
@@ -737,6 +738,7 @@ def wages_tait_sim(n_patients, true_toxicities, true_efficacies,
 #         trial_outcome = 100
 #         i += cohort_size
 #
+#     import pandas as pd
 #     trial_data = pd.DataFrame({'Tox': trial.toxicities(), 'Eff': trial.efficacies(),
 #                            'Dose': trial.doses(),
 #                            'ModelChoice': model_choices, 'Phase': phases,

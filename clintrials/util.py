@@ -10,8 +10,8 @@ from datetime import datetime
 from itertools import product
 import numpy as np
 import json
-import pandas as pd
-from statsmodels.stats.proportion import proportion_confint
+# import pandas as pd
+# from statsmodels.stats.proportion import proportion_confint
 
 from coll import to_1d_list_gen, to_1d_list
 
@@ -83,6 +83,7 @@ def row_to_json(row, **kwargs):
     # to_json turns all dates to long as 'ticks after epoch',
     # regardless of params passed (bug?) so cast dates to isoformat manually:
     # n.b. only actual dates can be cast to an isoformat string so screen null dates.
+    import pandas as pd
     for x in row.index:
         if isinstance(row[x], datetime) and not pd.isnull(row[x]):
             doc[x] = pd.to_datetime(row[x]).date().isoformat()
@@ -384,6 +385,8 @@ def get_proportion_confint_report(num_successes, num_trials, alpha=0.05, do_norm
 
     """
 
+    from statsmodels.stats.proportion import proportion_confint
+
     conf_int_reports = OrderedDict()
 
     if do_normal:
@@ -470,6 +473,7 @@ def cross_tab(col_row_pairs, cols=None, rows=None, to_json=False, do_value_count
         for j, c in enumerate(col_h):
             n = sum(np.array([x == c for x in col_data]) & np.array([x == r for x in row_data]))
             counts[i, j] = n
+    import pandas as pd
     df_n = pd.DataFrame(counts, index=row_h, columns=col_h)
 
     if not rows:

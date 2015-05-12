@@ -5,7 +5,6 @@ __contact__ = 'kristian.brock@gmail.com'
 from datetime import datetime
 import itertools
 import json
-import pandas as pd
 
 
 def sim_parameter_space(sim_func, ps, n1=1, n2=None, out_file=None):
@@ -109,12 +108,14 @@ def summarise_sims(sims, ps, func_map, var_map=None, to_pandas=True):
             row_tuples.append(these_metrics)
     if len(row_tuples):
         if to_pandas:
+            import pandas as pd
             return pd.DataFrame(row_tuples, pd.MultiIndex.from_tuples(index_tuples, names=var_names))
         else:
             # TODO
             return row_tuples, index_tuples
     else:
         if to_pandas:
+            import pandas as pd
             return pd.DataFrame(columns=func_map.keys())
         else:
             # TODO

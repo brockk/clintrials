@@ -13,7 +13,7 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 import numpy as np
 # import pandas as pd
 from scipy.optimize import brentq
-import statsmodels.api as sm
+# import statsmodels.api as sm
 
 from clintrials.common import inverse_logit
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
@@ -308,6 +308,7 @@ class InverseQuadraticCurve:
         x = np.array([z for z,_ in points])
         y = np.array([z for _,z in points])
         z = 1/x
+        import statsmodels.api as sm
         lm = sm.OLS(y, np.column_stack((np.ones_like(z), z, z**2))).fit()
         a, b, c = lm.params
         f = lambda x: a + b/x + c/x**2

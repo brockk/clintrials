@@ -389,7 +389,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     """
 
     def __init__(self, real_doses, theta_priors, tox_cutoff, eff_cutoff,
-                 tox_certainty, eff_certainty, metric, max_size, first_dose=1):
+                 tox_certainty, eff_certainty, metric, max_size, first_dose=1,
+                 avoid_skipping_untried_escalation=True, avoid_skipping_untried_deescalation=True):
         """
 
         Params:
@@ -404,6 +405,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                 of efficacy/toxicity probability pairs.
         max_size, maximum number of patients to use
         first_dose, starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
+        avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
 
         Instances have a dose_allocation_mode property that is set according to this schedule:
         0, when no dose has been chosen
@@ -428,6 +431,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.tox_certainty = tox_certainty
         self.eff_certainty = eff_certainty
         self.metric = metric
+        self.avoid_skipping_untried_escalation = avoid_skipping_untried_escalation
+        self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
 
         # Reset
         self.prob_tox = []
@@ -464,13 +469,19 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self._update_integrals(n)
         dose_is_admissable = np.array([x in self._admissable_set for x in range(1, self.num_doses+1)])
         if sum(dose_is_admissable) > 0:
-            # Select most desirable dose from admissable set, based on utility
+            # At least one dose is admissable. Select most desirable dose from admissable set based on utility
             masked_utility = np.where(dose_is_admissable, self.utility, np.nan)
             ideal_dose = np.nanargmax(masked_utility) + 1
             max_dose_given = self.maximum_dose_given()
-            if max_dose_given and ideal_dose - max_dose_given > 1:
+            min_dose_given = self.minimum_dose_given()
+            if self.avoid_skipping_untried_escalation and max_dose_given and ideal_dose - max_dose_given > 1:
                 # Prevent skipping untried doses in escalation
                 self._next_dose = max_dose_given + 1
+                self._status = 1
+                self.dose_allocation_mode = 2
+            elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - ideal_dose > 1:
+                # Prevent skipping untried doses in de-escalation
+                self._next_dose = min_dose_given - 1
                 self._status = 1
                 self.dose_allocation_mode = 2
             else:
@@ -478,12 +489,13 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                 self._status = 1
                 self.dose_allocation_mode = 1
         else:
+            # No dose is admissable.
             tolerable = [x >= self.tox_certainty for x in self.prob_acc_tox]
             if sum(tolerable) > 0:
                 # Select lowest untried dose above starting dose that is probably tolerable
                 for i, tol in enumerate(tolerable):
                     dose_level = i+1
-                    if dose_level > self._first_dose and self.treated_at_dose(dose_level) == 0:
+                    if tol and dose_level > self._first_dose and self.treated_at_dose(dose_level) == 0:
                         self._next_dose = dose_level
                         self._status = 1
                         self.dose_allocation_mode = 3
@@ -541,8 +553,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         """
 
-        admiss, u, u_star, obd, u_cushtion = solve_metrizable_efftox_scenario(prob_tox, prob_eff, self.metric,
-                                                                              self.tox_cutoff, self.eff_cutoff)
+        admiss, u, u_star, obd, u_cushion = solve_metrizable_efftox_scenario(prob_tox, prob_eff, self.metric,
+                                                                             self.tox_cutoff, self.eff_cutoff)
         return obd
 
 

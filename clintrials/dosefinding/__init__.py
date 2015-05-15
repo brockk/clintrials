@@ -33,6 +33,7 @@ class DoseFindingTrial(object):
     treated_at_dose(dose)
     toxicities_at_dose(dose)
     maximum_dose_given()
+    minimum_dose_given()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -131,6 +132,12 @@ class DoseFindingTrial(object):
     def maximum_dose_given(self):
         if len(self._doses) > 0:
             return max(self._doses)
+        else:
+            return None
+
+    def minimum_dose_given(self):
+        if len(self._doses) > 0:
+            return min(self._doses)
         else:
             return None
 
@@ -868,6 +875,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     toxicities_at_dose(dose)
     efficacies_at_dose(dose)
     maximum_dose_given()
+    minimum_dose_given()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -900,11 +908,6 @@ class EfficacyToxicityDoseFindingTrial(object):
     """
 
     __metaclass__ = abc.ABCMeta
-
-    # def __init__(self):
-    #     # TODO
-    #     # Reset
-    #     self._status = 0
 
     def __init__(self, first_dose, num_doses, max_size):
         if first_dose > num_doses:
@@ -976,6 +979,12 @@ class EfficacyToxicityDoseFindingTrial(object):
     def maximum_dose_given(self):
         if len(self._doses) > 0:
             return max(self._doses)
+        else:
+            return None
+
+    def minimum_dose_given(self):
+        if len(self._doses) > 0:
+            return min(self._doses)
         else:
             return None
 

@@ -10,7 +10,7 @@ from collections import OrderedDict
 from itertools import product, combinations_with_replacement
 import logging
 import numpy as np
-import pandas as pd
+# import pandas as pd
 from scipy.stats import uniform
 
 from clintrials.util import (atomic_to_json, iterable_to_json,
@@ -33,6 +33,7 @@ class DoseFindingTrial(object):
     treated_at_dose(dose)
     toxicities_at_dose(dose)
     maximum_dose_given()
+    minimum_dose_given()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -131,6 +132,12 @@ class DoseFindingTrial(object):
     def maximum_dose_given(self):
         if len(self._doses) > 0:
             return max(self._doses)
+        else:
+            return None
+
+    def minimum_dose_given(self):
+        if len(self._doses) > 0:
+            return min(self._doses)
         else:
             return None
 
@@ -703,6 +710,8 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
 
     """
 
+    import pandas as pd
+
     # Quick and dirty filter
     if len(filter):
         sims = filter_sims(sims, filter)
@@ -866,6 +875,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     toxicities_at_dose(dose)
     efficacies_at_dose(dose)
     maximum_dose_given()
+    minimum_dose_given()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -898,11 +908,6 @@ class EfficacyToxicityDoseFindingTrial(object):
     """
 
     __metaclass__ = abc.ABCMeta
-
-    # def __init__(self):
-    #     # TODO
-    #     # Reset
-    #     self._status = 0
 
     def __init__(self, first_dose, num_doses, max_size):
         if first_dose > num_doses:
@@ -974,6 +979,12 @@ class EfficacyToxicityDoseFindingTrial(object):
     def maximum_dose_given(self):
         if len(self._doses) > 0:
             return max(self._doses)
+        else:
+            return None
+
+    def minimum_dose_given(self):
+        if len(self._doses) > 0:
+            return min(self._doses)
         else:
             return None
 

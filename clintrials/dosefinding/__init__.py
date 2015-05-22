@@ -712,17 +712,18 @@ def summarise_dose_finding_sims(sims, label, num_doses, filter={}):
 
     import pandas as pd
 
-    # Quick and dirty filter
     if len(filter):
         sims = filter_sims(sims, filter)
 
     # Recommended Doses
     doses = [x[label]['RecommendedDose'] for x in sims]
     df_doses = pd.DataFrame({'RecN': pd.Series(doses).value_counts()}, index=range(-1, num_doses+1))
+    df_doses.RecN[np.isnan(df_doses.RecN)] = 0
     df_doses['Rec%'] = 1.0 * df_doses['RecN'] / df_doses['RecN'].sum()
     # Given Doses
     doses_given = to_1d_list([x[label]['Doses'] for x in sims])
     df_doses = df_doses.join(pd.DataFrame({'PatN': pd.Series(doses_given).value_counts()}))
+    df_doses.PatN[np.isnan(df_doses.PatN)] = 0
     df_doses['Pat%'] = 1.0 * df_doses['PatN'] / df_doses['PatN'].sum()
     df_doses['MeanPat']= 1.0 * df_doses['PatN'] / len(sims)
     # Order

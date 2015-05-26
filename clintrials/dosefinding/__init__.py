@@ -1009,13 +1009,17 @@ class EfficacyToxicityDoseFindingTrial(object):
 
         """
 
-        for (dose, tox, eff) in cases:
-            self._doses.append(dose)
-            self._toxicities.append(tox)
-            self._efficacies.append(eff)
+        if len(cases) > 0:
+            for (dose, tox, eff) in cases:
+                self._doses.append(dose)
+                self._toxicities.append(tox)
+                self._efficacies.append(eff)
 
-        self.__process_cases(cases)
-        self._next_dose = self.__calculate_next_dose(**kwargs)
+            self.__process_cases(cases)
+            self._next_dose = self.__calculate_next_dose(**kwargs)
+        else:
+            logging.warn('Cannot update design with no cases')
+
         return self._next_dose
 
     def admissable_set(self):

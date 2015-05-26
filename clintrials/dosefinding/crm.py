@@ -276,6 +276,7 @@ class CRM(DoseFindingTrial):
         self.use_quick_integration = use_quick_integration
         self.estimate_var = estimate_var
         self.avoid_skipping_untried_escalation = avoid_skipping_untried_escalation
+        self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
         self.lowest_dose_too_toxic_hurdle = lowest_dose_too_toxic_hurdle
         self.lowest_dose_too_toxic_certainty = lowest_dose_too_toxic_certainty
         self.termination_func = termination_func

@@ -710,19 +710,37 @@ def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff
     """
     if len(prob_tox) != len(prob_eff):
         raise Exception('prob_tox and prob_eff should be lists or tuples of the same length.')
+
     t = prob_tox
     r = prob_eff
+    # Probabilities of 0.0 and 1.0 in the prob_tox and eff vectors cause problems when calculating utilities.
+    # Being pragmatic, the easiest way to deal with them is to swap them for some number that is
+    # nearly 0.0 or 1.0
+    t = np.where(t<=0, 0.001, t)
+    t = np.where(t>=1, 0.999, t)
+    r = np.where(r<=0, 0.001, r)
+    r = np.where(r>=1, 0.999, r)
+
     conform = np.array([(eff > eff_cutoff) and (tox < tox_cutoff) for eff, tox in zip(r, t)])
     util = np.array([metric(eff, tox) for eff, tox in zip(r, t)])
     conform_util = np.where(conform, util, -np.inf)
-    if sum(conform) >= 2:
-        obd = np.nanargmax(conform_util)+1
-        u2, u1 = np.sort(conform_util)[-2:]
-        u_cushion = u1 - u2
-        return conform, util, u1, obd, u_cushion
-    elif sum(conform) >= 1:
-        obd = np.nanargmax(conform_util)+1
-        u1 = np.nanmax(conform_util)
-        return conform, util, u1, obd, np.nan
-    else:
+
+    if np.all(np.isnan(util)):
+        logging.warn('All NaN util encountered in solve_metrizable_efftox_scenario')
         return conform, util, np.nan, -1, np.nan
+    elif np.all(np.isnan(conform_util)):
+        logging.warn('All NaN conform_util encountered in solve_metrizable_efftox_scenario')
+        return conform, util, np.nan, -1, np.nan
+    else:
+        if sum(conform) >= 2:
+            obd = np.nanargmax(conform_util)+1
+            u2, u1 = np.sort(conform_util)[-2:]
+            u_cushion = u1 - u2
+            return conform, util, u1, obd, u_cushion
+        elif sum(conform) >= 1:
+            obd = np.nanargmax(conform_util)+1
+            u1 = np.nanmax(conform_util)
+            return conform, util, u1, obd, np.nan
+
+    # Default:
+    return conform, util, np.nan, -1, np.nan

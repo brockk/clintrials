@@ -3,6 +3,7 @@ __contact__ = 'kristian.brock@gmail.com'
 
 
 from datetime import datetime
+import glob
 import itertools
 import json
 
@@ -82,6 +83,24 @@ def sim_parameter_space(sim_func, ps, n1=1, n2=None, out_file=None):
         print j, datetime.now(), len(sims)
     return sims
 
+
+def _open_json_local(file_loc):
+    return json.load(open(file_loc, 'r'))
+
+
+def _open_json_url(url):
+    return json.load(urllib2.urlopen(url))
+
+
+def go_fetch_json_sims(file_pattern):
+    files = glob.glob(file_pattern)
+    sims = []
+    for f in files:
+        sub_sims = _open_json_local(f)
+        print f, len(sub_sims)
+        sims += sub_sims
+    print 'Fetched', len(sims), 'sims'
+    return sims
 
 def filter_sims(sims, filter):
     """ Filter a list of simulations.

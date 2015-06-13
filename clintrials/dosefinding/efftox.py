@@ -10,12 +10,13 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 
 """
 
+import logging
+
 import numpy as np
 from scipy.optimize import brentq
 
 from clintrials.common import inverse_logit
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
-from clintrials.util import correlated_binary_outcomes_from_uniforms
 
 
 def scale_doses(real_doses):
@@ -599,12 +600,12 @@ def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff
     # Probabilities of 0.0 and 1.0 in the prob_tox and eff vectors cause problems when calculating utilities.
     # Being pragmatic, the easiest way to deal with them is to swap them for some number that is
     # nearly 0.0 or 1.0
-    t = np.where(t<=0, 0.001, t)
-    t = np.where(t>=1, 0.999, t)
-    r = np.where(r<=0, 0.001, r)
-    r = np.where(r>=1, 0.999, r)
+    t = np.where(t <= 0, 0.001, t)
+    t = np.where(t >= 1, 0.999, t)
+    r = np.where(r <= 0, 0.001, r)
+    r = np.where(r >= 1, 0.999, r)
 
-    conform = np.array([(eff > eff_cutoff) and (tox < tox_cutoff) for eff, tox in zip(r, t)])
+    conform = np.array([(eff >= eff_cutoff) and (tox <= tox_cutoff) for eff, tox in zip(r, t)])
     util = np.array([metric(eff, tox) for eff, tox in zip(r, t)])
     conform_util = np.where(conform, util, -np.inf)
 

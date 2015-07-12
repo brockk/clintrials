@@ -419,9 +419,10 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         Instances have a dose_allocation_mode property that is set according to this schedule:
         0, when no dose has been chosen
         1, when optimal dose is selected from non-trivial admissable set (this is normal operation)
-        2, when next untried dose is selected to avoid skipping doses in escalation
-        3, when admissable set is empty so lowest untried dose above starting dose
-            that is probably tolerable is selected
+        2, when next untried dose is selected to avoid skipping doses
+        2.5, when dose is maintained because ideal dose would require skipping and interim dose is inadmissable
+        3, when admissable set is empty so lowest untried dose above starting dose that is probably tolerable is
+            selected
         4, when admissable set is empty and there is no untested dose above first dose to try
         5, when admissable set is empty and all doses were probably too toxic
 
@@ -484,15 +485,30 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
             min_dose_given = self.minimum_dose_given()
             if self.avoid_skipping_untried_escalation and max_dose_given and ideal_dose - max_dose_given > 1:
                 # Prevent skipping untried doses in escalation
-                self._next_dose = max_dose_given + 1
-                self._status = 1
-                self.dose_allocation_mode = 2
+                next_best_dose = max_dose_given + 1
+                if next_best_dose in self._admissable_set:
+                    # Allocate to next untried dose on way towards ideal dose
+                    self._next_dose = max_dose_given + 1
+                    self._status = 1
+                    self.dose_allocation_mode = 2
+                else:
+                    # Ideal dose involves (forbidden) skipping and the next best dose is inadmissable, so stay put
+                    self._status = 1
+                    self.dose_allocation_mode = 2.5
             elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - ideal_dose > 1:
                 # Prevent skipping untried doses in de-escalation
-                self._next_dose = min_dose_given - 1
-                self._status = 1
-                self.dose_allocation_mode = 2
+                next_best_dose = min_dose_given - 1
+                if next_best_dose in self._admissable_set:
+                    # Allocate to next untried dose on way towards ideal dose
+                    self._next_dose = next_best_dose
+                    self._status = 1
+                    self.dose_allocation_mode = 2
+                else:
+                    # Ideal dose involves (forbidden) skipping and the next best dose is inadmissable, so stay put
+                    self._status = 1
+                    self.dose_allocation_mode = 2.5
             else:
+                # Design is setting dose to ideal dose with no restrictions
                 self._next_dose = ideal_dose
                 self._status = 1
                 self.dose_allocation_mode = 1

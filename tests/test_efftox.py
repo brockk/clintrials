@@ -184,7 +184,9 @@ def test_matchpoint_efftox():
     epsilon1 = 0.02
     epsilon2 = 0.04
 
-    # Cohort 1 - No responses and two toxes
+    # Cohort 1 - No responses and two toxes.
+    # This situation tests dose allocation mode 2.5 where a combination of avoidance of
+    # dose-skipping and sparse admissable set => recommended dose stays put
     cases = [(3, 0, 0), (3, 1, 0), (3, 1, 0)]
     next_dose = et.update(cases, n=10**6)
     assert next_dose == 3

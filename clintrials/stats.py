@@ -114,7 +114,6 @@ def chi_squ_test(x, y, x_positive_value=None, y_positive_value=None, ci_alpha=0.
     :return: A dict object with all available statistics
     :rtype: collections.OrderedDict
 
-
     """
     sum_oe = 0.0
     x_set = set(x)

@@ -416,15 +416,21 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
         avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
 
-        Instances have a dose_allocation_mode property that is set according to this schedule:
-        0, when no dose has been chosen
-        1, when optimal dose is selected from non-trivial admissable set (this is normal operation)
-        2, when next untried dose is selected to avoid skipping doses
-        2.5, when dose is maintained because ideal dose would require skipping and interim dose is inadmissable
-        3, when admissable set is empty so lowest untried dose above starting dose that is probably tolerable is
-            selected
-        4, when admissable set is empty and there is no untested dose above first dose to try
-        5, when admissable set is empty and all doses were probably too toxic
+        Note: dose_allocation_mode has been suppressed. Remove once I know it is not needed. KB
+        # Instances have a dose_allocation_mode property that is set according to this schedule:
+        # 0, when no dose has been chosen
+        # 1, when optimal dose is selected from non-trivial admissable set (this is normal operation)
+        # 2, when next untried dose is selected to avoid skipping doses
+        # 2.5, when dose is maintained because ideal dose would require skipping and intervening dose is inadmissable
+        # 3, when admissable set is empty so lowest untried dose above starting dose that is probably tolerable is
+        #     selected
+        # 4, when admissable set is empty and there is no untested dose above first dose to try
+        # 5, when admissable set is empty and all doses were probably too toxic
+        # 6, when admissable set is not-empty but trial stops because 1) ideal dose requires skipping; 2) next
+        #     -best dose is inadmissable; and 3) current dose is inadmissable. I question the validity of this
+        #     scenario because avoiding stopping was possible. However, I am trying to faithfully reproduce
+        #     the MD Anderson software so this scenario is programmed in. That may change. If you want to avoid
+        #     this outcome, allow dose skipping.
 
         """
 
@@ -449,7 +455,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_tox = []
         self.prob_acc_eff = []
         self.utility = []
-        self.dose_allocation_mode = 0
+        # self.dose_allocation_mode = 0
         # Estimate integrals
         _ = self._update_integrals()
 
@@ -461,8 +467,11 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         post_probs = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                                 self.eff_cutoff, n)
         prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)
-        admissable = np.array([x >= self.tox_certainty and y >= self.eff_certainty
-                               for x, y in zip(prob_acc_tox, prob_acc_eff)])
+        admissable = np.array([(x >= self.tox_certainty and y >= self.eff_certainty) # Probably acceptable tox & eff
+                               or (i==self.maximum_dose_given() and x >= self.tox_certainty) # lowest untried dose above
+                                                                                             # starting dose and
+                                                                                             # probably acceptable tox
+                               for i, (x, y) in enumerate(zip(prob_acc_tox, prob_acc_eff))])
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
         # by the equation form that Thall & Cook chose.
@@ -476,64 +485,25 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
         self._update_integrals(n)
-        dose_is_admissable = np.array([x in self._admissable_set for x in range(1, self.num_doses+1)])
-        if sum(dose_is_admissable) > 0:
-            # At least one dose is admissable. Select most desirable dose from admissable set based on utility
-            masked_utility = np.where(dose_is_admissable, self.utility, np.nan)
-            ideal_dose = np.nanargmax(masked_utility) + 1
-            max_dose_given = self.maximum_dose_given()
-            min_dose_given = self.minimum_dose_given()
-            if self.avoid_skipping_untried_escalation and max_dose_given and ideal_dose - max_dose_given > 1:
-                # Prevent skipping untried doses in escalation
-                next_best_dose = max_dose_given + 1
-                if next_best_dose in self._admissable_set:
-                    # Allocate to next untried dose on way towards ideal dose
-                    self._next_dose = max_dose_given + 1
-                    self._status = 1
-                    self.dose_allocation_mode = 2
+
+        max_dose_given = self.maximum_dose_given()
+        min_dose_given = self.minimum_dose_given()
+        for i in np.argsort(-self.utility):  # dose-indices from highest to lowest utility
+            dose_level = i+1
+            if dose_level in self.admissable_set():
+                if self.avoid_skipping_untried_escalation and max_dose_given and dose_level - max_dose_given > 1:
+                    pass  # No skipping
+                elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - dose_level > 1:
+                    pass  # No skipping
                 else:
-                    # Ideal dose involves (forbidden) skipping and the next best dose is inadmissable, so stay put
                     self._status = 1
-                    self.dose_allocation_mode = 2.5
-            elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - ideal_dose > 1:
-                # Prevent skipping untried doses in de-escalation
-                next_best_dose = min_dose_given - 1
-                if next_best_dose in self._admissable_set:
-                    # Allocate to next untried dose on way towards ideal dose
-                    self._next_dose = next_best_dose
-                    self._status = 1
-                    self.dose_allocation_mode = 2
-                else:
-                    # Ideal dose involves (forbidden) skipping and the next best dose is inadmissable, so stay put
-                    self._status = 1
-                    self.dose_allocation_mode = 2.5
-            else:
-                # Design is setting dose to ideal dose with no restrictions
-                self._next_dose = ideal_dose
-                self._status = 1
-                self.dose_allocation_mode = 1
+                    #self.dose_allocation_mode = 1
+                    self._next_dose = dose_level
+                    break
         else:
-            # No dose is admissable.
-            tolerable = [x >= self.tox_certainty for x in self.prob_acc_tox]
-            if sum(tolerable) > 0:
-                # Select lowest untried dose above starting dose that is probably tolerable
-                for i, tol in enumerate(tolerable):
-                    dose_level = i+1
-                    if tol and dose_level > self._first_dose and self.treated_at_dose(dose_level) == 0:
-                        self._next_dose = dose_level
-                        self._status = 1
-                        self.dose_allocation_mode = 3
-                        break
-                else:
-                    # All doses have been tried or are below first dose. There is nothing left to try, so...
-                    self._next_dose = -1
-                    self._status = -2
-                    self.dose_allocation_mode = 4
-            else:
-                # All doses are too toxic. There is nothing left to try, so...
-                self._next_dose = -1
-                self._status = -1
-                self.dose_allocation_mode = 5
+            # No dose can be selected
+            self._next_dose = -1
+            self._status = -1
 
         return self._next_dose
 
@@ -544,7 +514,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_tox = []
         self.prob_acc_eff = []
         self.utility = []
-        self.dose_allocation_mode = 0
+        # self.dose_allocation_mode = 0
         # Estimate integrals
         _ = self._update_integrals()
 
@@ -554,12 +524,11 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
-    
+
     def posterior_params(self, n=10**5):
-    	""" Get posterior parameter estimates """
-    	cases = zip(self._doses, self._toxicities, self._efficacies)
-    	return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff,
-                                           self.eff_cutoff, n)
+        """ Get posterior parameter estimates """
+        cases = zip(self._doses, self._toxicities, self._efficacies)
+        return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff, self.eff_cutoff, n)
 
     def optimal_decision(self, prob_tox, prob_eff):
         """ Get the optimal dose choice for a given dose-toxicity curve.

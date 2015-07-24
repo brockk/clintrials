@@ -10,7 +10,6 @@ from collections import OrderedDict
 from itertools import product, combinations_with_replacement
 import logging
 import numpy as np
-# import pandas as pd
 from scipy.stats import uniform
 
 from clintrials.util import (atomic_to_json, iterable_to_json,
@@ -1018,6 +1017,90 @@ class EfficacyToxicityDoseFindingTrial(object):
         return -1  # Default implementation
 
 
+def dose_transition_pathways(trial, first_cohort_number, last_cohort_number, cohort_size,
+                             cases_already_observed=None, next_dose=None,
+                             to_pandas_dataframe=True, **kwargs):
+    """ Calculate the dose-transition pathways of a DoseFindingTrial.
+
+    :param trial: a dose-finding trial design, an instance of some subclass of DoseFindingTrial
+    :type trial: DoseFindingTrial
+    :param first_cohort_number: cohort pathways starting with this cohort
+    :type first_cohort_number: int
+    :param last_cohort_number: cohort pathways to this cohort, inclusive
+    :type last_cohort_number: int
+    :param cohort_size: number of patients per cohort
+    :type cohort_size: int
+    :param cases_already_observed: list of 2-tuples representing cases already observed, in format
+                                    (dose, toxicity), where dose is the given (1-based) dose level
+                                    and toxicity = 1 for a toxicity event; 0 for a tolerance event.
+    :type cases_already_observed: list
+    :param next_dose: the dose that will be given to the first cohort.
+                      If None and cases_already_observed is non-empty, next_dose is calculated by the trial instance,
+                          after being updated with the observed cases.
+                      If None and cases_already_observed is empty, the trial's first dose is used.
+    :type next_dose: int
+
+    :param to_pandas_dataframe: True to get a pandas DataFrame back; False to get list of tuples
+    :type to_pandas_dataframe: bool
+    :param kwargs: extra kwargs for calls to trial.update
+    :type kwargs: dict
+    :return: collection of dose-transition pathways
+    :rtype: pandas.DataFrame or list
+
+    """
+
+    def _path_and_dose_recommendations_to_row(path, doses):
+        if len(doses) > 0:
+            row = [doses[0]]
+            for num_tox, dose in zip(path, doses[1:]):
+                row.append(num_tox)
+                row.append(dose)
+        else:
+            row = []
+        return row
+
+    def _get_col_names(first_cohort_number, last_cohort_number, cohort_size):
+        cohort_ids = range(first_cohort_number, last_cohort_number+1)
+        cols = ['Dose_0']
+        for i in cohort_ids:
+            cols.append('Tox_{}'.format(i))
+            cols.append('Dose_{}'.format(i))
+        return cols
+
+    num_cohort_toxicities = range(cohort_size+1)
+    trial_outcomes = list(product(num_cohort_toxicities, repeat=1+last_cohort_number-first_cohort_number))
+
+    if cases_already_observed is None:
+        cases_already_observed = []
+
+    out = []
+    for path in trial_outcomes:
+        trial.reset()
+        trial.update(cases_already_observed, **kwargs)
+        if next_dose is not None:
+            dose = next_dose
+        elif len(cases_already_observed) > 0:
+            dose = trial.next_dose()
+        else:
+            dose = trial.first_dose()
+        doses = [dose]
+
+        for num_toxs in path:
+            cohort_cases = [(dose, 1)] * num_toxs + [(dose, 0)] * (cohort_size - num_toxs)
+            dose = trial.update(cohort_cases, **kwargs)
+            doses.append(dose)
+
+        out.append(_path_and_dose_recommendations_to_row(path, doses))
+
+    if to_pandas_dataframe:
+        import pandas as pd
+        out_pd = pd.DataFrame(out)
+        out_pd.columns = _get_col_names(first_cohort_number, last_cohort_number, cohort_size)
+        return out_pd
+    else:
+        return out
+
+
 def _patient_outcome_to_label(po):
     """ Converts (0,0) to Neither; (1,0) to Toxicity, etc"""
     if po == (0,0):
@@ -1030,6 +1113,7 @@ def _patient_outcome_to_label(po):
         return 'Both'
     else:
         return 'Error'
+
 
 def efficacy_toxicity_dose_transition_pathways(trial, first_cohort_number, last_cohort_number, cohort_size,
                                                cases_already_observed, next_dose=None, to_pandas_dataframe=True,

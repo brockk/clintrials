@@ -5,6 +5,7 @@ __contact__ = 'kristian.brock@gmail.com'
 
 
 from collections import OrderedDict
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde, chi2, norm
@@ -84,16 +85,26 @@ def or_test(a, b, c, d, ci_alpha=0.05):
 
     """
 
+    abcd = [a, b, c, d]
+    to_return = OrderedDict()
+    to_return['ABCD'] = abcd
+
+    if np.any(np.array(abcd) < 0):
+        logging.error('Negative event count. Garbage!')
+    elif np.any(np.array(abcd) == 0):
+        logging.warn('At least one event count was zero. Added one to all counts.')
+        abcd = np.array(abcd) + 1
+        a,b,c,d = abcd
+
     odds_ratio = 1. * (a * d) / (c * b)
-    log_or_se = np.sqrt(sum(1. / np.array([a, b, c, d])))
+    log_or_se = np.sqrt(sum(1. / np.array(abcd)))
     ci_scalars = norm.ppf([ci_alpha/2, 1-ci_alpha/2])
     or_ci = np.exp(np.log(odds_ratio) + ci_scalars * log_or_se)
 
-    to_return = OrderedDict()
-    to_return['ABCD'] = [a, b, c, d]
     to_return['OR'] = odds_ratio
     to_return['Log(OR) SE'] = log_or_se
     to_return['OR CI'] = list(or_ci)
+
     to_return['Alpha'] = ci_alpha
     return to_return
 
@@ -131,6 +142,8 @@ def chi_squ_test(x, y, x_positive_value=None, y_positive_value=None, ci_alpha=0.
     to_return = OrderedDict([('TestStatistic', sum_oe), ('p', p), ('Df', num_df)])
 
     if len(x_set) == 2 and len(y_set)==2:
+        x = np.array(x)
+        y = np.array(y)
         if not x_positive_value:
             x_positive_value=1
         if not y_positive_value:

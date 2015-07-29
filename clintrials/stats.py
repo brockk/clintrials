@@ -92,7 +92,7 @@ def or_test(a, b, c, d, ci_alpha=0.05):
     if np.any(np.array(abcd) < 0):
         logging.error('Negative event count. Garbage!')
     elif np.any(np.array(abcd) == 0):
-        logging.warn('At least one event count was zero. Added one to all counts.')
+        logging.info('At least one event count was zero. Added one to all counts.')
         abcd = np.array(abcd) + 1
         a,b,c,d = abcd
 

@@ -485,25 +485,33 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
         self._update_integrals(n)
-
-        max_dose_given = self.maximum_dose_given()
-        min_dose_given = self.minimum_dose_given()
-        for i in np.argsort(-self.utility):  # dose-indices from highest to lowest utility
-            dose_level = i+1
-            if dose_level in self.admissable_set():
-                if self.avoid_skipping_untried_escalation and max_dose_given and dose_level - max_dose_given > 1:
-                    pass  # No skipping
-                elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - dose_level > 1:
-                    pass  # No skipping
-                else:
-                    self._status = 1
-                    #self.dose_allocation_mode = 1
-                    self._next_dose = dose_level
-                    break
+        if self.treated_at_dose(self.first_dose()) > 0:
+            # First dose has been tried so modelling may commence
+            max_dose_given = self.maximum_dose_given()
+            min_dose_given = self.minimum_dose_given()
+            for i in np.argsort(-self.utility):  # dose-indices from highest to lowest utility
+                dose_level = i+1
+                if dose_level in self.admissable_set():
+                    if self.avoid_skipping_untried_escalation and max_dose_given and dose_level - max_dose_given > 1:
+                        pass  # No skipping
+                    elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - dose_level > 1:
+                        pass  # No skipping
+                    else:
+                        self._status = 1
+                        #self.dose_allocation_mode = 1
+                        self._next_dose = dose_level
+                        break
+            else:
+                # No dose can be selected
+                self._next_dose = -1
+                self._status = -1
         else:
-            # No dose can be selected
-            self._next_dose = -1
-            self._status = -1
+            # First dose not given yet, so keep recommending that, like EffTox software does
+            self._next_dose = self.first_dose()
+            if self.size() > 0:
+                self._status = -10
+            else:
+                self._status = 0
 
         return self._next_dose
 

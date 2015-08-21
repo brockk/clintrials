@@ -158,3 +158,27 @@ def chi_squ_test(x, y, x_positive_value=None, y_positive_value=None, ci_alpha=0.
         pass
 
     return to_return
+
+
+class ProbabilityDensitySample:
+
+    def __init__(self, samp, func):
+        self._samp = samp
+        self._probs = func(samp)
+        self._scale = self._probs.mean()
+
+    def expectation(self, vector):
+        return np.mean(vector * self._probs / self._scale)
+
+    def variance(self, vector):
+        exp = self.expectation(vector)
+        exp2 = self.expectation(vector**2)
+        return exp2 - exp**2
+
+    def cdf(self, i, y):
+        """ Get the cumulative density of the parameter in position i that is less than y. """
+        return self.expectation(self._samp[:,i]<y)
+
+    def quantile(self, i, p):
+        """ Get the value of the parameter at position i for which p of the probability mass is in the left-tail. """
+        return fsolve(lambda z: self.cdf(i, z) - p, 0.1)[0]

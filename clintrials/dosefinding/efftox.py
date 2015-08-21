@@ -17,6 +17,7 @@ from scipy.optimize import brentq
 
 from clintrials.common import inverse_logit
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
+from clintrials.stats import ProbabilityDensitySample
 
 
 def scale_doses(real_doses):
@@ -129,21 +130,22 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     lik_integrand = lambda x: _L_n(_cases, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
                               * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
                               * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
-    lik = lik_integrand(samp)
-    scale = lik.mean()
+    pds = ProbabilityDensitySample(samp, lik_integrand)
+    # lik = lik_integrand(samp)
+    # scale = lik.mean()
 
     probs = []
     for x in scaled_doses:
         tox_probs = _pi_T(x, mu=samp[:,0], beta=samp[:,1])
         eff_probs = _pi_E(x, mu=samp[:,2], beta1=samp[:,3], beta2=samp[:,4])
         probs.append((
-            np.mean(tox_probs * lik / scale),
-            np.mean(eff_probs * lik / scale),
-            np.mean((tox_probs < tox_cutoff) * lik / scale),
-            np.mean((eff_probs > eff_cutoff) * lik / scale)
+            pds.expectation(tox_probs),
+            pds.expectation(eff_probs),
+            pds.expectation(tox_probs < tox_cutoff),
+            pds.expectation(eff_probs > eff_cutoff)
         ))
 
-    return probs
+    return probs, pds
     
     
 def efftox_get_posterior_params(cases, priors, scaled_doses, tox_cutoff, eff_cutoff, n=10**5):
@@ -200,22 +202,23 @@ def efftox_get_posterior_params(cases, priors, scaled_doses, tox_cutoff, eff_cut
     lik_integrand = lambda x: _L_n(_cases, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
                               * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
                               * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
-    lik = lik_integrand(samp)
-    scale = lik.mean()
+    pds = ProbabilityDensitySample(samp, lik_integrand)
+    # lik = lik_integrand(samp)
+    # scale = lik.mean()
 
     params = []
     params.append(
     	(
-        	np.mean(samp[:, 0] * lik / scale),
-	        np.mean(samp[:, 1] * lik / scale),
-	        np.mean(samp[:, 2] * lik / scale),
-	        np.mean(samp[:, 3] * lik / scale),
-	        np.mean(samp[:, 4] * lik / scale),
-	        np.mean(samp[:, 5] * lik / scale),
+        	pds.expectation(samp[:, 0]),
+	        pds.expectation(samp[:, 1]),
+	        pds.expectation(samp[:, 2]),
+	        pds.expectation(samp[:, 3]),
+	        pds.expectation(samp[:, 4]),
+	        pds.expectation(samp[:, 5]),
     	)
     )
 
-    return params
+    return params, pds
 
 
 # Desirability metrics
@@ -464,8 +467,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
             admissable set.
         """
         cases = zip(self._doses, self._toxicities, self._efficacies)
-        post_probs = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
-                                                self.eff_cutoff, n)
+        post_probs, _pds = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
+                                                     self.eff_cutoff, n)
         prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)
         admissable = np.array([(x >= self.tox_certainty and y >= self.eff_certainty) # Probably acceptable tox & eff
                                or (i==self.maximum_dose_given() and x >= self.tox_certainty) # lowest untried dose above
@@ -482,6 +485,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_eff = prob_acc_eff
         self._admissable_set = admissable_set
         self.utility = utility
+        self.pds = _pds
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
         self._update_integrals(n)
@@ -536,7 +540,9 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     def posterior_params(self, n=10**5):
         """ Get posterior parameter estimates """
         cases = zip(self._doses, self._toxicities, self._efficacies)
-        return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff, self.eff_cutoff, n)
+        post_params, pds = efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff,
+                                                       self.eff_cutoff, n)
+        return post_params
 
     def optimal_decision(self, prob_tox, prob_eff):
         """ Get the optimal dose choice for a given dose-toxicity curve.

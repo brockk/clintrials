@@ -10,8 +10,8 @@ from datetime import datetime
 from itertools import product
 import numpy as np
 import json
-import pandas as pd
-from statsmodels.stats.proportion import proportion_confint
+# import pandas as pd
+# from statsmodels.stats.proportion import proportion_confint
 
 from coll import to_1d_list_gen, to_1d_list
 
@@ -83,6 +83,7 @@ def row_to_json(row, **kwargs):
     # to_json turns all dates to long as 'ticks after epoch',
     # regardless of params passed (bug?) so cast dates to isoformat manually:
     # n.b. only actual dates can be cast to an isoformat string so screen null dates.
+    import pandas as pd
     for x in row.index:
         if isinstance(row[x], datetime) and not pd.isnull(row[x]):
             doc[x] = pd.to_datetime(row[x]).date().isoformat()
@@ -384,6 +385,8 @@ def get_proportion_confint_report(num_successes, num_trials, alpha=0.05, do_norm
 
     """
 
+    from statsmodels.stats.proportion import proportion_confint
+
     conf_int_reports = OrderedDict()
 
     if do_normal:
@@ -470,6 +473,7 @@ def cross_tab(col_row_pairs, cols=None, rows=None, to_json=False, do_value_count
         for j, c in enumerate(col_h):
             n = sum(np.array([x == c for x in col_data]) & np.array([x == r for x in row_data]))
             counts[i, j] = n
+    import pandas as pd
     df_n = pd.DataFrame(counts, index=row_h, columns=col_h)
 
     if not rows:
@@ -510,7 +514,7 @@ class ParameterSpace:
     """ Class to handle combinations of parameters (i.e. a parameter space) in simulations. """
 
     def __init__(self):
-        self.vals_map = {}
+        self.vals_map = OrderedDict()
 
     def add(self, label, values):
         """ Add a variable and a list of all values the variable may take.
@@ -574,6 +578,28 @@ class ParameterSpace:
         """
 
         return self.vals_map.keys()
+
+    def dimensions(self):
+        """ Get the numbers of values per dimension.
+
+        E.g. a param-space of two values for A and three values for B would return [2, 3]
+
+        :return: Array of number of values per dimension
+        :rtype: numpy.array
+
+        """
+
+        return np.array([len(y) for x,y in self.vals_map.iteritems()])
+
+    def size(self):
+        """ Get the size of this parameter space, i.e. the product of the dimension sizes.
+
+        :return: Size of parameter space.
+        :rtype: int
+
+        """
+
+        return np.prod(self.dimensions())
 
     def __getitem__(self, key):
         return self.vals_map[key]

@@ -10,43 +10,51 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 
 """
 
+import logging
+
 import numpy as np
-import pandas as pd
 from scipy.optimize import brentq
-import statsmodels.api as sm
 
 from clintrials.common import inverse_logit
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
-from clintrials.util import correlated_binary_outcomes_from_uniforms
 
 
-def efftox_eta_T(x, mu, beta):
-    return mu + beta * x
+def scale_doses(real_doses):
+    """
+    :param real_doses:
+    :return:
+    """
+
+    return np.log(real_doses) - np.mean(np.log(real_doses))
 
 
-def efftox_eta_E(x, mu, beta1, beta2):
-    return mu + beta1 * x + beta2 * x**2
+def _eta_T(scaled_dose, mu, beta):
+    return mu + beta * scaled_dose
 
 
-def efftox_pi_T(x, mu, beta):
-    return inverse_logit(efftox_eta_T(x, mu, beta))
+def _eta_E(scaled_dose, mu, beta1, beta2):
+    return mu + beta1 * scaled_dose + beta2 * scaled_dose**2
 
 
-def efftox_pi_E(x, mu, beta1, beta2):
-    return inverse_logit(efftox_eta_E(x, mu, beta1, beta2))
+def _pi_T(scaled_dose, mu, beta):
+    return inverse_logit(_eta_T(scaled_dose, mu, beta))
 
 
-def efftox_pi_ab(dose, tox, eff, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
+def _pi_E(scaled_dose, mu, beta1, beta2):
+    return inverse_logit(_eta_E(scaled_dose, mu, beta1, beta2))
+
+
+def _pi_ab(scaled_dose, tox, eff, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
     """ Calculate likelihood of observing toxicity and efficacy with given parameters. """
     a, b = eff, tox
-    p1 = efftox_pi_E(dose, mu_E, beta1_E, beta2_E)
-    p2 = efftox_pi_T(dose, mu_T, beta_T)
+    p1 = _pi_E(scaled_dose, mu_E, beta1_E, beta2_E)
+    p2 = _pi_T(scaled_dose, mu_T, beta_T)
     response = p1**a * (1-p1)**(1-a) * p2**b * (1-p2)**(1-b)
     response += -1**(a+b) * p1 * (1-p1) * p2 * (1-p2) * (np.exp(psi) - 1) / (np.exp(psi) + 1)
     return response
 
 
-def efftox_L_n(D, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
+def _L_n(D, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
     """ Calculate compound likelihood of observing cases D with given parameters.
 
     Params:
@@ -61,13 +69,13 @@ def efftox_L_n(D, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi):
     """
 
     response = np.ones(len(mu_T))
-    for dose, tox, eff in D:
-        p = efftox_pi_ab(dose, tox, eff, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi)
+    for scaled_dose, tox, eff in D:
+        p = _pi_ab(scaled_dose, tox, eff, mu_T, beta_T, mu_E, beta1_E, beta2_E, psi)
         response *= p
     return response
 
 
-def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5, n=10**5):
+def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cutoff, n=10**5):
     """ Get the posterior probabilities after having observed cumulative data D in an EffTox trial.
 
     Note: This function evaluates the posterior integrals using Monte Carlo integration. Thall & Cook
@@ -76,12 +84,12 @@ def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5,
     this method is slow.
 
     Params:
-    D, list of 3-tuples, (dose, toxicity, efficacy), where dose is on Thall & Cook's codified scale (see below),
-                                toxicity = 1 for toxic event, 0 for tolerance event,
-                                and efficacy = 1 for efficacious outcome, 0 for alternative.
+    cases, list of 3-tuples, (dose, toxicity, efficacy), where dose is the given (1-based) dose level,
+                    toxicity = 1 for a toxicity event; 0 for a tolerance event,
+                    efficacy = 1 for an efficacy event; 0 for a non-efficacy event.
     priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi respectively
             Each prior object should support obj.ppf(x) and obj.pdf(x)
-    doses, ordered list of all possible doses where each dose is on Thall & Cook's codified scale (see below),
+    scaled_doses, ordered list of all possible doses where each dose is on Thall & Cook's codified scale (see below),
     tox_cutoff, the desired maximum toxicity
     eff_cutoff, the desired minimum efficacy
     n, number of random points to use in Monte Carlo integration.
@@ -91,7 +99,7 @@ def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5,
                 Prob(Efficacy greater than cutoff)], for each dose in doses,
             i.e. returned obj is of length len(doses) and each interior list of length 4.
 
-    Note: Thall & Cook's codified scale is thus:
+    Note: Thall & Cook's codified dose scale is thus:
     If doses 10mg, 20mg and 25mg are given so that d = [10, 20, 25], then the codified doses, x, are
     x = ln(d) - mean(ln(dose)) = [-0.5365, 0.1567, 0.3798]
 
@@ -99,6 +107,14 @@ def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5,
 
     if len(priors) != 6:
         raise ValueError('priors should have 6 items.')
+
+    # Convert dose-levels given to dose amounts given
+    if len(cases) > 0:
+        dose_levels, tox_events, eff_events = zip(*cases)
+        scaled_doses_given = [scaled_doses[x-1] for x in dose_levels]
+        _cases = zip(scaled_doses_given, tox_events, eff_events)
+    else:
+        _cases = []
 
     # The ranges of integration must be specified. In truth, the integration range is (-Infinity, Infinity)
     # for each variable. In practice, though, integrating to infinity is problematic, especially in
@@ -110,16 +126,16 @@ def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5,
     limits = [(dist.ppf(epsilon), dist.ppf(1-epsilon)) for dist in priors]
     samp = np.column_stack([np.random.uniform(*limit_pair, size=n) for limit_pair in limits])
 
-    lik_integrand = lambda x: efftox_L_n(D, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
+    lik_integrand = lambda x: _L_n(_cases, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
                               * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
                               * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
     lik = lik_integrand(samp)
     scale = lik.mean()
 
     probs = []
-    for x in doses:
-        tox_probs = efftox_pi_T(x, mu=samp[:,0], beta=samp[:,1])
-        eff_probs = efftox_pi_E(x, mu=samp[:,2], beta1=samp[:,3], beta2=samp[:,4])
+    for x in scaled_doses:
+        tox_probs = _pi_T(x, mu=samp[:,0], beta=samp[:,1])
+        eff_probs = _pi_E(x, mu=samp[:,2], beta1=samp[:,3], beta2=samp[:,4])
         probs.append((
             np.mean(tox_probs * lik / scale),
             np.mean(eff_probs * lik / scale),
@@ -128,6 +144,78 @@ def efftox_get_posterior_probs(D, priors, doses, tox_cutoff=0.3, eff_cutoff=0.5,
         ))
 
     return probs
+    
+    
+def efftox_get_posterior_params(cases, priors, scaled_doses, tox_cutoff, eff_cutoff, n=10**5):
+    """ Get the posterior parameter estimates after having observed cumulative data D in an EffTox trial.
+
+    Note: This function evaluates the posterior integrals using Monte Carlo integration. Thall & Cook
+    use the method of Monahan & Genz. I imagine that is quicker and more accurate but it is also
+    more difficult to program, so I have skipped it. It remains a medium-term aim, however, because
+    this method is slow.
+
+    Params:
+    cases, list of 3-tuples, (dose, toxicity, efficacy), where dose is the given (1-based) dose level,
+                    toxicity = 1 for a toxicity event; 0 for a tolerance event,
+                    efficacy = 1 for an efficacy event; 0 for a non-efficacy event.
+    priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi respectively
+            Each prior object should support obj.ppf(x) and obj.pdf(x)
+    scaled_doses, ordered list of all possible doses where each dose is on Thall & Cook's codified scale (see below),
+    tox_cutoff, the desired maximum toxicity
+    eff_cutoff, the desired minimum efficacy
+    n, number of random points to use in Monte Carlo integration.
+
+    Returns:
+    list of posterior parameters as tuples, [ (mu_T, beta_T, mu_E, beta_T_1, beta_T_2, psi) ], and that's it for now.
+            i.e. returned obj is of length 1 and first interior tuple is of length 6.
+            More objects might be added to the outer list eventually.
+
+    Note: Thall & Cook's codified dose scale is thus:
+    If doses 10mg, 20mg and 25mg are given so that d = [10, 20, 25], then the codified doses, x, are
+    x = ln(d) - mean(ln(dose)) = [-0.5365, 0.1567, 0.3798]
+
+    """
+
+    if len(priors) != 6:
+        raise ValueError('priors should have 6 items.')
+
+    # Convert dose-levels given to dose amounts given
+    if len(cases) > 0:
+        dose_levels, tox_events, eff_events = zip(*cases)
+        scaled_doses_given = [scaled_doses[x-1] for x in dose_levels]
+        _cases = zip(scaled_doses_given, tox_events, eff_events)
+    else:
+        _cases = []
+
+    # The ranges of integration must be specified. In truth, the integration range is (-Infinity, Infinity)
+    # for each variable. In practice, though, integrating to infinity is problematic, especially in
+    # 6 dimensions. The limits of integration should capture all probability density, but not be too
+    # generous, e.g. -1000 to 1000 would be stupid because the density at most points would be practically zero.
+    # I use percentage points of the various prior distributions. The risk is that if the prior
+    # does not cover the posterior range well, it will not estimate it well. This needs attention. TODO
+    epsilon = 0.0001
+    limits = [(dist.ppf(epsilon), dist.ppf(1-epsilon)) for dist in priors]
+    samp = np.column_stack([np.random.uniform(*limit_pair, size=n) for limit_pair in limits])
+
+    lik_integrand = lambda x: _L_n(_cases, x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]) \
+                              * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
+                              * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
+    lik = lik_integrand(samp)
+    scale = lik.mean()
+
+    params = []
+    params.append(
+    	(
+        	np.mean(samp[:, 0] * lik / scale),
+	        np.mean(samp[:, 1] * lik / scale),
+	        np.mean(samp[:, 2] * lik / scale),
+	        np.mean(samp[:, 3] * lik / scale),
+	        np.mean(samp[:, 4] * lik / scale),
+	        np.mean(samp[:, 5] * lik / scale),
+    	)
+    )
+
+    return params
 
 
 # Desirability metrics
@@ -182,6 +270,28 @@ class LpNormCurve:
         else:
             return np.nan
 
+    def solve(self, prob_eff=None, prob_tox=None, delta=0):
+        """ Specify exactly one of prob_eff or prob_tox and this will return the other, for given delta"""
+
+        if prob_eff is None and prob_tox is None:
+            raise Exception('Specify prob_eff or prob_tox')
+        if prob_eff is not None and prob_tox is not None:
+            raise Exception('Specify just one of prob_eff and prob_tox')
+
+        x, y = prob_eff, prob_tox
+        x_l, y_l = self.minimum_tolerable_efficacy, self.maximum_tolerable_toxicity
+        scaled_delta = (1-delta)**self.p
+        if x is None:
+            # Solve for x
+            b = y / y_l
+            a = (scaled_delta - b**self.p)**(1/self.p)
+            return 1 - (1 - x_l)*a
+        else:
+            # Solve for y
+            a = ((1 - x) / (1 - x_l))
+            b = (scaled_delta - a**self.p)**(1/self.p)
+            return b*y_l
+
 
 class InverseQuadraticCurve:
     """ Fit an indifference contour of the type, y = a + b/x + c/x^2 where y = Prob(Tox) and x = Prob(Eff).
@@ -206,13 +316,15 @@ class InverseQuadraticCurve:
         x = np.array([z for z,_ in points])
         y = np.array([z for _,z in points])
         z = 1/x
+        import statsmodels.api as sm
         lm = sm.OLS(y, np.column_stack((np.ones_like(z), z, z**2))).fit()
-        a,b,c = lm.params
+        a, b, c = lm.params
         f = lambda x: a + b/x + c/x**2
         # Check f is not a terrible fit
         if sum(np.abs(f(x) - y)) > 0.00001:
             ValueError('%s do not fit an ABC curve well' % points)
         self.f = f
+        self.a, self.b, self.c = a, b, c
 
     def __call__(self, prob_eff, prob_tox):
         x = prob_eff
@@ -229,6 +341,11 @@ class InverseQuadraticCurve:
             return d1 / d2 - 1
         else:
             return np.nan
+
+    def solve(self, prob_eff=None, prob_tox=None, delta=0):
+        """ Specify exactly one of prob_eff or prob_tox and this will return the other, for given delta"""
+        # TODO
+        raise NotImplementedError()
 
 # I used to call the InverseQuadraticCurve an ABC_Curve because it uses three parameters, a, b and c.
 # Similarly, I used to call the LpNormCurve a HingedCurve because it uses a hinge point.
@@ -280,11 +397,12 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     """
 
     def __init__(self, real_doses, theta_priors, tox_cutoff, eff_cutoff,
-                 tox_certainty, eff_certainty, metric, max_size, first_dose=1):
+                 tox_certainty, eff_certainty, metric, max_size, first_dose=1,
+                 avoid_skipping_untried_escalation=True, avoid_skipping_untried_deescalation=True):
         """
 
         Params:
-        real_doses, list of possible doses in regular units, e.g. use [10, 25] for dose of 10mg and 25mg
+        real_doses, list of actual doses. E.g. for 10mg and 25mg, use [10, 25].
         theta_priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
                         respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
         tox_cutoff, the maximum acceptable probability of toxicity
@@ -295,15 +413,24 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                 of efficacy/toxicity probability pairs.
         max_size, maximum number of patients to use
         first_dose, starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
+        avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
 
-        Instances have a dose_allocation_mode property that is set according to this schedule:
-        0, when no dose has been chosen
-        1, when optimal dose is selected from non-trivial admissable set (this is normal operation)
-        2, when next untried dose is selected to avoid skipping doses in escalation
-        3, when admissable set is empty so lowest untried dose above starting dose
-            that is probably tolerable is selected
-        4, when admissable set is empty and there is no untested dose above first dose to try
-        5, when admissable set is empty and all doses were probably too toxic
+        Note: dose_allocation_mode has been suppressed. Remove once I know it is not needed. KB
+        # Instances have a dose_allocation_mode property that is set according to this schedule:
+        # 0, when no dose has been chosen
+        # 1, when optimal dose is selected from non-trivial admissable set (this is normal operation)
+        # 2, when next untried dose is selected to avoid skipping doses
+        # 2.5, when dose is maintained because ideal dose would require skipping and intervening dose is inadmissable
+        # 3, when admissable set is empty so lowest untried dose above starting dose that is probably tolerable is
+        #     selected
+        # 4, when admissable set is empty and there is no untested dose above first dose to try
+        # 5, when admissable set is empty and all doses were probably too toxic
+        # 6, when admissable set is not-empty but trial stops because 1) ideal dose requires skipping; 2) next
+        #     -best dose is inadmissable; and 3) current dose is inadmissable. I question the validity of this
+        #     scenario because avoiding stopping was possible. However, I am trying to faithfully reproduce
+        #     the MD Anderson software so this scenario is programmed in. That may change. If you want to avoid
+        #     this outcome, allow dose skipping.
 
         """
 
@@ -319,6 +446,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.tox_certainty = tox_certainty
         self.eff_certainty = eff_certainty
         self.metric = metric
+        self.avoid_skipping_untried_escalation = avoid_skipping_untried_escalation
+        self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
 
         # Reset
         self.prob_tox = []
@@ -326,15 +455,23 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_tox = []
         self.prob_acc_eff = []
         self.utility = []
-        self.dose_allocation_mode = 0
+        # self.dose_allocation_mode = 0
+        # Estimate integrals
+        _ = self._update_integrals()
 
-    def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
+    def _update_integrals(self, n=10**5):
+        """ Method to recalculate integrals, thus updating probabilties of eff and tox, utilities, and
+            admissable set.
+        """
         cases = zip(self._doses, self._toxicities, self._efficacies)
         post_probs = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                                 self.eff_cutoff, n)
         prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)
-        admissable = np.array([x >= self.tox_certainty and y >= self.eff_certainty
-                               for x, y in zip(prob_acc_tox, prob_acc_eff)])
+        admissable = np.array([(x >= self.tox_certainty and y >= self.eff_certainty) # Probably acceptable tox & eff
+                               or (i==self.maximum_dose_given() and x >= self.tox_certainty) # lowest untried dose above
+                                                                                             # starting dose and
+                                                                                             # probably acceptable tox
+                               for i, (x, y) in enumerate(zip(prob_acc_tox, prob_acc_eff))])
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
         # by the equation form that Thall & Cook chose.
@@ -345,41 +482,36 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_eff = prob_acc_eff
         self._admissable_set = admissable_set
         self.utility = utility
-        if sum(admissable) > 0:
-            # Select most desirable dose from admissable set
-            ideal_dose = np.arange(1, len(utility)+1)[admissable][np.argmax(utility[admissable])]   # Based on
-                                                                                                    # desirability
+
+    def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
+        self._update_integrals(n)
+        if self.treated_at_dose(self.first_dose()) > 0:
+            # First dose has been tried so modelling may commence
             max_dose_given = self.maximum_dose_given()
-            if max_dose_given and ideal_dose - max_dose_given > 1:
-                # Prevent skipping untried doses in escalation
-                self._next_dose = max_dose_given + 1
-                self._status = 1
-                self.dose_allocation_mode = 2
-            else:
-                self._next_dose = ideal_dose
-                self._status = 1
-                self.dose_allocation_mode = 1
-        else:
-            tolerable = [x >= self.tox_certainty for x in prob_acc_tox]
-            if sum(tolerable) > 0:
-                # Select lowest untried dose above starting dose that is probably tolerable
-                for i, tol in enumerate(tolerable):
-                    dose_level = i+1
-                    if dose_level > self._first_dose and self.treated_at_dose(dose_level) == 0:
-                        self._next_dose = dose_level
+            min_dose_given = self.minimum_dose_given()
+            for i in np.argsort(-self.utility):  # dose-indices from highest to lowest utility
+                dose_level = i+1
+                if dose_level in self.admissable_set():
+                    if self.avoid_skipping_untried_escalation and max_dose_given and dose_level - max_dose_given > 1:
+                        pass  # No skipping
+                    elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - dose_level > 1:
+                        pass  # No skipping
+                    else:
                         self._status = 1
-                        self.dose_allocation_mode = 3
+                        #self.dose_allocation_mode = 1
+                        self._next_dose = dose_level
                         break
-                else:
-                    # All doses have been tried or are below first dose. There is nothing left to try, so...
-                    self._next_dose = -1
-                    self._status = -2
-                    self.dose_allocation_mode = 4
             else:
-                # All doses are too toxic. There is nothing left to try, so...
+                # No dose can be selected
                 self._next_dose = -1
                 self._status = -1
-                self.dose_allocation_mode = 5
+        else:
+            # First dose not given yet, so keep recommending that, like EffTox software does
+            self._next_dose = self.first_dose()
+            if self.size() > 0:
+                self._status = -10
+            else:
+                self._status = 0
 
         return self._next_dose
 
@@ -390,7 +522,9 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_acc_tox = []
         self.prob_acc_eff = []
         self.utility = []
-        self.dose_allocation_mode = 0
+        # self.dose_allocation_mode = 0
+        # Estimate integrals
+        _ = self._update_integrals()
 
     def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
         """ Subclasses should override this method to perform an cases-specific processing. """
@@ -399,115 +533,91 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
+    def posterior_params(self, n=10**5):
+        """ Get posterior parameter estimates """
+        cases = zip(self._doses, self._toxicities, self._efficacies)
+        return efftox_get_posterior_params(cases, self.priors, self._scaled_doses, self.tox_cutoff, self.eff_cutoff, n)
 
-def efftox_sim(n_patients, true_toxicities, true_efficacies, first_dose,
-               real_doses, theta_priors, tox_cutoff, eff_cutoff, tox_certainty, eff_certainty,
-               metric, tox_eff_odds_ratio=1.0, tolerances=None, cohort_size=1, n=10**5):
-    """ Simulate EffTox trials.
+    def optimal_decision(self, prob_tox, prob_eff):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
 
-    Params:
-    n_patients, number of patients
-    true_toxicities, list of the true toxicity rates. Obviously these are unknown in real-life but
-                    we use them in simulations to test the algorithm. Should be same length as prior.
-    true_efficacies, list of the true efficacy rates. These are unknown in real-life as well.
-                            Should be same length as prior.
-    first_dose, starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
-    real_doses, list of possible doses in regular units, e.g. use [10, 25] for dose of 10mg and 25mg
-    theta_priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
-                    respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
-    tox_cutoff, the maximum acceptable probability of toxicity
-    eff_cutoff, the minimium acceptable probability of efficacy
-    tox_certainty, the posterior certainty required that toxicity is less than cutoff
-    eff_certainty, the posterior certainty required that efficacy is greater than than cutoff
-    metric, instance of LpNormCurve or InverseQuadraticCurve or similar
-    tox_eff_odds_ratio, odds ratio of toxicity and efficacy events. Use 1. for no association
-    tolerances, optional n_patients*3 array of uniforms used to infer correlated toxicity and efficacy events
-                        for patients. This array is passed to function that calculates correlated binary events from
-                        uniform variables and marginal probabilities.
-                        Leave None to get randomly sampled data.
-                        This parameter is specifiable so that dose-finding methods can be compared on same 'patients'.
-    cohort_size, to add several patients at once
-    n, number of points to use in numerical integration. Higher is more accurate but slower.
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity and efficacy curves.
 
-    Returns: a 3-tuple of lists:
-        - a list of doses selected
-        - a list of dictionaries, containing patient-specific data on trial progress
-        - a list of trial outcome ids, explained below.
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :param prob_tox: collection of efficacy probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
 
-    Trial outcomes:
-        0: trial not started
-        100: trial completed normally
-        -2: trial abandoned early because no doses were admissable
+        """
+
+        admiss, u, u_star, obd, u_cushion = solve_metrizable_efftox_scenario(prob_tox, prob_eff, self.metric,
+                                                                             self.tox_cutoff, self.eff_cutoff)
+        return obd
+
+
+def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):
+    """ Solve a metrizable efficacy-toxicity dose-finding scenario.
+
+
+    Metrizable means that the priority of doses can be calculated using a metric.
+    A dose is conformative if it has probability of toxicity less than some cutoff; and
+    probability of efficacy greater than some cutoff.
+    The OBD is the dose with the highest utility in the conformative set. The OBD does not
+    necessarily have a positive utility.
+
+    This function returns, as a 5-tuple, (an array of bools representing whether each dose is conformative, the array
+    of utlities, the utility of the optimal dose, the 1-based OBD level, and the utility distance from the OBD to the
+    next most preferable dose in the conformative set where there are several conformative doses)
+
+    :param prob_tox: Probabilities of toxicity at each dose
+    :type prob_tox: iterable
+    :param prob_eff: Probabilities of efficacy at each dose
+    :type prob_eff: iterable
+    :param metric: Metric to score
+    :type metric: class like clintrials.dosefinding.efftox.LpNormCurve or func(prob_eff, prob_tox) returning float
+    :param tox_cutoff: maximum acceptable toxicity probability
+    :type tox_cutoff: float
+    :param eff_cutoff: minimum acceptable efficacy probability
+    :type eff_cutoff: float
 
     """
+    if len(prob_tox) != len(prob_eff):
+        raise Exception('prob_tox and prob_eff should be lists or tuples of the same length.')
 
-    if len(true_efficacies) != len(true_toxicities):
-        raise ValueError('true_efficacies and true_toxicities should be same length.')
-    if len(true_toxicities) != len(real_doses):
-        raise ValueError('true_toxicities and real_doses should be same length.')
-    if tolerances is not None:
-        if tolerances.ndim != 2 or tolerances.shape[0] < n_patients:
-            raise ValueError('tolerances should be an n_patients*3 array')
+    t = prob_tox
+    r = prob_eff
+    # Probabilities of 0.0 and 1.0 in the prob_tox and eff vectors cause problems when calculating utilities.
+    # Being pragmatic, the easiest way to deal with them is to swap them for some number that is
+    # nearly 0.0 or 1.0
+    t = np.where(t <= 0, 0.001, t)
+    t = np.where(t >= 1, 0.999, t)
+    r = np.where(r <= 0, 0.001, r)
+    r = np.where(r >= 1, 0.999, r)
+
+    conform = np.array([(eff >= eff_cutoff) and (tox <= tox_cutoff) for eff, tox in zip(r, t)])
+    util = np.array([metric(eff, tox) for eff, tox in zip(r, t)])
+    conform_util = np.where(conform, util, -np.inf)
+
+    if np.all(np.isnan(util)):
+        logging.warn('All NaN util encountered in solve_metrizable_efftox_scenario')
+        return conform, util, np.nan, -1, np.nan
+    elif np.all(np.isnan(conform_util)):
+        logging.warn('All NaN conform_util encountered in solve_metrizable_efftox_scenario')
+        return conform, util, np.nan, -1, np.nan
     else:
-        tolerances = np.random.uniform(size=3*n_patients).reshape(n_patients, 3)
+        if sum(conform) >= 2:
+            obd = np.nanargmax(conform_util)+1
+            u2, u1 = np.sort(conform_util)[-2:]
+            u_cushion = u1 - u2
+            return conform, util, u1, obd, u_cushion
+        elif sum(conform) >= 1:
+            obd = np.nanargmax(conform_util)+1
+            u1 = np.nanmax(conform_util)
+            return conform, util, u1, obd, np.nan
 
-    trial = EffTox(real_doses, theta_priors, tox_cutoff, eff_cutoff, tox_certainty, eff_certainty,
-                   metric, first_dose)
-    if first_dose:
-        if first_dose != trial.next_dose():
-            raise ValueError('first dose was ignored!')
-    dose_level = trial.next_dose()
-    i, trial_outcome = 0, 0
-    doses_given, prob_tox_hat, prob_eff_hat, prob_acc_tox_hat, prob_acc_eff_hat, utility = [], [], [], [], [], []
-    admissable_sets, dose_allocation_modes = [], []
-    while i < n_patients:
-        u = (true_toxicities[dose_level-1], true_efficacies[dose_level-1])
-        events = correlated_binary_outcomes_from_uniforms(tolerances[i:i+cohort_size, ], u,
-                                                          psi=tox_eff_odds_ratio).astype(int)
-        new_cases = np.column_stack(([dose_level] * cohort_size, events))
-        doses_given.extend([dose_level] * cohort_size)
-        dose_level = trial.update(new_cases, n=n)
-        prob_tox_hat.extend([trial.prob_tox] * cohort_size)
-        prob_eff_hat.extend([trial.prob_eff] * cohort_size)
-        prob_acc_tox_hat.extend([trial.prob_acc_tox] * cohort_size)
-        prob_acc_eff_hat.extend([trial.prob_acc_eff] * cohort_size)
-        utility.extend([trial.utility] * cohort_size)
-        admissable_sets.extend([trial.admissable_set()] * cohort_size)
-        dose_allocation_modes.extend([trial.dose_allocation_mode] * cohort_size)
-
-        if dose_level < 0:
-            #trial_outcome = -2
-            trial_outcome = trial.status()
-            break
-        trial_outcome = 100
-        i += cohort_size
-
-    # Trial-level pertinent data
-    dose_label = 'Dose'
-    tox_label, eff_label= 'Tox', 'Eff'
-    prob_tox_label, prob_eff_label= 'ProbTox', 'ProbEff'
-    prob_acc_tox_label, prob_acc_eff_label= 'ProbAccTox', 'ProbAccEff'
-    utility_label = 'Utility'
-    as_label, dam_label = 'Admissable', 'DoseMode'
-    df1 = pd.DataFrame({tox_label: trial.toxicities(), eff_label: trial.efficacies(), dose_label: doses_given,
-                        as_label: admissable_sets, dam_label: dose_allocation_modes},
-                       index=range(1, trial.size()+1))
-    thing = {tox_label: trial.toxicities(), eff_label: trial.efficacies(), dose_label: doses_given,
-             as_label: admissable_sets, dam_label: dose_allocation_modes}
-    df2 = pd.DataFrame(prob_tox_hat, columns=[prob_tox_label + str(x) for x in range(1, len(real_doses)+1)],
-                       index=range(1, trial.size()+1))
-    for k, x in enumerate(np.array(prob_tox_hat).T):
-        thing[prob_tox_label + str(k+1)] = x
-    df3 = pd.DataFrame(prob_eff_hat, columns=[prob_eff_label + str(x) for x in range(1, len(real_doses)+1)],
-                       index=range(1, trial.size()+1))
-    for k, x in enumerate(np.array(prob_eff_hat).T):
-        thing[prob_eff_label + str(k+1)] = x
-    for k, x in enumerate(np.array(prob_acc_tox_hat).T):
-        thing[prob_acc_tox_label + str(k+1)] = x
-    for k, x in enumerate(np.array(prob_acc_eff_hat).T):
-        thing[prob_acc_eff_label + str(k+1)] = x
-    df4 = pd.DataFrame(utility, columns=[utility_label + str(x) for x in range(1, len(real_doses)+1)],
-                       index=range(1, trial.size()+1))
-    for k, x in enumerate(np.array(utility).T):
-        thing[utility_label + str(k+1)] = x
-    return trial.next_dose(), pd.concat([df1, df2, df3, df4], axis=1), trial_outcome
+    # Default:
+    return conform, util, np.nan, -1, np.nan

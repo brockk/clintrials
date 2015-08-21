@@ -231,8 +231,8 @@ class CRM(DoseFindingTrial):
 
     def __init__(self, prior, target, first_dose, max_size, F_func=empiric, inverse_F=inverse_empiric,
                  beta_prior=norm(0, np.sqrt(1.34)), method="bayes", use_quick_integration=False, estimate_var=True,
-                 avoid_escalation_dose_skipping=False, lowest_dose_too_toxic_hurdle=0.0,
-                 lowest_dose_too_toxic_certainty=0.0, termination_func=None):
+                 avoid_skipping_untried_escalation=False, avoid_skipping_untried_deescalation=False,
+                 lowest_dose_too_toxic_hurdle=0.0, lowest_dose_too_toxic_certainty=0.0, termination_func=None):
         """
 
         Params:
@@ -248,7 +248,8 @@ class CRM(DoseFindingTrial):
                                 In simulations, fast and approximate often suffices.
                                 In trial scenarios, use slow and accurate!
         estimate_var, True to estimate the posterior variance of beta
-        avoid_escalation_dose_skipping, True to avoid dose skipping in escalation
+        avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
+        avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
         lowest_dose_too_toxic_hurdle,
         lowest_dose_too_toxic_certainty,
         termination_func, a function that takes this trial instance as a sole parameter and returns True if trial should
@@ -274,7 +275,8 @@ class CRM(DoseFindingTrial):
         self.method = method
         self.use_quick_integration = use_quick_integration
         self.estimate_var = estimate_var
-        self.avoid_escalation_dose_skipping = avoid_escalation_dose_skipping
+        self.avoid_skipping_untried_escalation = avoid_skipping_untried_escalation
+        self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
         self.lowest_dose_too_toxic_hurdle = lowest_dose_too_toxic_hurdle
         self.lowest_dose_too_toxic_certainty = lowest_dose_too_toxic_certainty
         self.termination_func = termination_func
@@ -292,8 +294,6 @@ class CRM(DoseFindingTrial):
         return
 
     def _DoseFindingTrial__calculate_next_dose(self):
-        # TODO: control escalating after toxicity?
-        current_dose = self.next_dose()
         proposed_dose, beta_hat, beta_var = crm(prior=self.prior, target=self.target, toxicities=self._toxicities,
                                                 dose_levels=self._doses, first_dose=self._first_dose,
                                                 F_func=self.F_func, inverse_F=self.inverse_F,
@@ -303,17 +303,21 @@ class CRM(DoseFindingTrial):
         self.beta_hat = beta_hat
         self.beta_var = beta_var
 
-        if self.avoid_escalation_dose_skipping and proposed_dose - current_dose >= 2:
-            # Avoid skipping in escalation by setting proposed dose to current dose + 1
-            proposed_dose = current_dose + 1
-            # Note: other methods of managing dose escalation are possible!
-            # Maybe we want to only avoid skipping *untried* doses...
+        max_dose_given = self.maximum_dose_given()
+        min_dose_given = self.minimum_dose_given()
+        if self.avoid_skipping_untried_escalation and max_dose_given and proposed_dose - max_dose_given > 1:
+            # Avoid skipping untried doses in escalation by setting proposed dose to max_dose_given + 1
+            proposed_dose = max_dose_given + 1
+        elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - proposed_dose > 1:
+            # Avoid skipping untried doses in de-escalation by setting proposed dose to min_dose_given - 1
+            proposed_dose = min_dose_given - 1
+        # Note: other methods of limiting dose escalation and de-escalation are possible.
 
         # Toxicity at lowest dose
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:
-            labels = [self.inverse_F(p, a0=self.first_dose, beta=self.beta_prior.mean()) for p in self.prior]
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
             beta_sample = norm(loc=beta_hat, scale=np.sqrt(beta_var)).rvs(1000000)  # N.b. normal sample a la prior
-            p0_sample = self.F_func(labels[0], a0=self.first_dose, beta=beta_sample)
+            p0_sample = self.F_func(labels[0], a0=self.first_dose(), beta=beta_sample)
             p0_tox = np.mean(p0_sample > self.lowest_dose_too_toxic_hurdle)
 
             if p0_tox > self.lowest_dose_too_toxic_certainty:
@@ -321,6 +325,30 @@ class CRM(DoseFindingTrial):
                 self._status = -1
 
         return proposed_dose
+
+    def prob_tox(self, n=10**6):
+        if self.estimate_var:
+            # Estimate probability of toxicity using plug-in mean and variance for beta, and randomly
+            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
+            # TODO: research replacing this with a proper posterior integral when in bayes mode.
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+            beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
+            p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+            return np.array([np.mean(x) for x in p0_sample])
+        else:
+            raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
+
+    def prob_tox_exceeds(self, tox_cutoff, n=10**6):
+        if self.estimate_var:
+            # Estimate probability of toxicity exceeds tox_cutoff using plug-in mean and variance for beta, and randomly
+            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
+            # TODO: research replacing this with a proper posterior integral when in bayes mode.
+            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+            beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
+            p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+            return np.array([np.mean(x>tox_cutoff) for x in p0_sample])
+        else:
+            raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
 
     def has_more(self):
         """ Is the trial ongoing? """
@@ -330,4 +358,20 @@ class CRM(DoseFindingTrial):
             return not self.termination_func(self)
         else:
             return True
+
+    def optimal_decision(self, prob_tox):
+        """ Get the optimal dose choice for a given dose-toxicity curve.
+
+        .. note:: Ken Cheung (2014) presented the idea that the optimal behaviour of a dose-finding
+        design can be calculated for a given set of patients with their own specific tolerances by
+        invoking the dose decicion on the complete (and unknowable) toxicity curve.
+
+        :param prob_tox: collection of toxicity probabilities
+        :type prob_tox: list
+        :return: the optimal (1-based) dose decision
+        :rtype: int
+
+        """
+
+        return np.argmin(np.abs(prob_tox - self.target)) + 1
 

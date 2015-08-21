@@ -1,0 +1,711 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>clintrials.util &mdash; clintrials 0.1.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="clintrials 0.1.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for clintrials.util</h1><div class="highlight"><pre>
+<span class="n">__author__</span> <span class="o">=</span> <span class="s">&#39;Kristian Brock&#39;</span>
+<span class="n">__contact__</span> <span class="o">=</span> <span class="s">&#39;kristian.brock@gmail.com&#39;</span>
+
+<span class="sd">&quot;&quot;&quot; This module provides a home for all those useful bits-and-bobs that do not warrant their own module. &quot;&quot;&quot;</span>
+
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">Iterable</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">copy</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">statsmodels.stats.proportion</span> <span class="kn">import</span> <span class="n">proportion_confint</span>
+
+<span class="kn">from</span> <span class="nn">coll</span> <span class="kn">import</span> <span class="n">to_1d_list_gen</span><span class="p">,</span> <span class="n">to_1d_list</span>
+
+
+<div class="viewcode-block" id="fullname"><a class="viewcode-back" href="../../index.html#clintrials.util.fullname">[docs]</a><span class="k">def</span> <span class="nf">fullname</span><span class="p">(</span><span class="n">o</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Get the fully-qualified class name of an object</span>
+
+<span class="sd">    :param o: object of any kind</span>
+<span class="sd">    :type o: object</span>
+<span class="sd">    :return: fully-qualified class name</span>
+<span class="sd">    :rtype: string</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">o</span><span class="o">.</span><span class="n">__module__</span> <span class="o">+</span> <span class="s">&quot;.&quot;</span> <span class="o">+</span> <span class="n">o</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span>
+
+</div>
+<div class="viewcode-block" id="atomic_to_json"><a class="viewcode-back" href="../../index.html#clintrials.util.atomic_to_json">[docs]</a><span class="k">def</span> <span class="nf">atomic_to_json</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Wrapper to ensure the smallest object is in a JSON-friendly form.</span>
+
+<span class="sd">    .. note:: This function exists because numpy types raise errors when you try to JSON save them. Don&#39;t believe me?</span>
+<span class="sd">                Try ``json.dumps(np.int(1))`` and get something about 1 not being serializable.</span>
+
+<span class="sd">    :param obj: Object to convert to JSON-able form</span>
+<span class="sd">    :type obj: object</span>
+<span class="sd">    :return: obj, or its scalar equivalent if obj is a numpy generic type</span>
+<span class="sd">    :rtype: object</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">generic</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asscalar</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">obj</span>
+
+</div>
+<div class="viewcode-block" id="iterable_to_json"><a class="viewcode-back" href="../../index.html#clintrials.util.iterable_to_json">[docs]</a><span class="k">def</span> <span class="nf">iterable_to_json</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Returns a list of JSON-friendly representations of the objects in a collection.</span>
+
+<span class="sd">    :param obj: JSON-ise each element of this collection</span>
+<span class="sd">    :type obj: iterable</span>
+<span class="sd">    :return: congruent list of JSON-able objects</span>
+<span class="sd">    :rtype: list</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">atomic_to_json</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">atomic_to_json</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="row_to_json"><a class="viewcode-back" href="../../index.html#clintrials.util.row_to_json">[docs]</a><span class="k">def</span> <span class="nf">row_to_json</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Turn a pandas.Series to a JSON object</span>
+
+<span class="sd">    :param row: a row to turn to JSON-able dict</span>
+<span class="sd">    :type row: pandas.Series</span>
+<span class="sd">    :param kwargs: map of keyword args to pass to json.loads</span>
+<span class="sd">    :type kwargs: dict</span>
+<span class="sd">    :return: a JSON-friendly dict representation of row</span>
+<span class="sd">    :rtype: dict</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">UnicodeDecodeError</span><span class="p">:</span>
+        <span class="c"># iso-8859-1 has solved this before; but might not solve all ills.</span>
+        <span class="k">return</span> <span class="n">row_to_json</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s">&#39;iso-8859-1&#39;</span><span class="p">)</span>
+    <span class="c"># to_json turns all dates to long as &#39;ticks after epoch&#39;,</span>
+    <span class="c"># regardless of params passed (bug?) so cast dates to isoformat manually:</span>
+    <span class="c"># n.b. only actual dates can be cast to an isoformat string so screen null dates.</span>
+    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">row</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">x</span><span class="p">]):</span>
+            <span class="n">doc</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">x</span><span class="p">])</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">doc</span>
+
+</div>
+<div class="viewcode-block" id="df_to_json"><a class="viewcode-back" href="../../index.html#clintrials.util.df_to_json">[docs]</a><span class="k">def</span> <span class="nf">df_to_json</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">do_value_counts</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">definitely_do_value_counts</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+               <span class="n">do_column_summaries</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">do_row_summaries</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Serialize a pandas.DataFrame to an object that may be written as JSON.</span>
+
+<span class="sd">    .. note:: pandas.DataFrame provides its own JSON serialization method but I don&#39;t like it.</span>
+
+<span class="sd">    :param df: DataFrame to serialise to JSON-able form.</span>
+<span class="sd">    :type df: pandas.DataFrame</span>
+<span class="sd">    :param do_value_counts: True to calculate value counts for each column</span>
+<span class="sd">    :type do_value_counts: bool</span>
+<span class="sd">    :param definitely_do_value_counts: If there is no aggregation possible (i.e. all elements are unique), aggregation</span>
+<span class="sd">                                        will be suppressed. Use True to override this suppression.</span>
+<span class="sd">    :type definitely_do_value_counts: bool</span>
+<span class="sd">    :param do_column_summaries: True to calculate summary statistics for each column</span>
+<span class="sd">    :type do_column_summaries: bool</span>
+<span class="sd">    :param do_row_summaries: True to calculate summary statistics for each row</span>
+<span class="sd">    :type do_row_summaries: bool</span>
+<span class="sd">    :return: A JSON-able representation of df</span>
+<span class="sd">    :rtype: dict</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">doc</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;Format&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;Table&#39;</span>
+
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">([(</span><span class="s">&#39;ID&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)),</span> <span class="p">(</span><span class="s">&#39;Position&#39;</span><span class="p">,</span> <span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;Label&#39;</span><span class="p">,</span> <span class="n">atomic_to_json</span><span class="p">(</span><span class="n">row_name</span><span class="p">))]))</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;Rows&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;NumRows&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+    <span class="n">cols</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">col_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+        <span class="n">cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">([(</span><span class="s">&#39;ID&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)),</span> <span class="p">(</span><span class="s">&#39;Position&#39;</span><span class="p">,</span> <span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;Label&#39;</span><span class="p">,</span> <span class="n">atomic_to_json</span><span class="p">(</span><span class="n">col_name</span><span class="p">))]))</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;Cols&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;NumCols&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="n">table_data</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">col_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+        <span class="n">col_data</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">col_name</span><span class="p">]):</span>
+            <span class="n">col_data</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">atomic_to_json</span><span class="p">(</span><span class="n">o</span><span class="p">)</span>
+        <span class="n">table_data</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="p">)]</span> <span class="o">=</span> <span class="n">col_data</span>
+    <span class="n">doc</span><span class="p">[</span><span class="s">&#39;Data&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">table_data</span>
+
+    <span class="k">if</span> <span class="n">do_value_counts</span><span class="p">:</span>
+        <span class="n">freqs</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">col_name</span> <span class="ow">in</span> <span class="n">df</span><span class="p">:</span>
+            <span class="n">vc</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col_name</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vc</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="ow">or</span> <span class="n">definitely_do_value_counts</span><span class="p">:</span>
+                <span class="n">freqs</span><span class="p">[</span><span class="n">atomic_to_json</span><span class="p">(</span><span class="n">col_name</span><span class="p">)]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">atomic_to_json</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="n">atomic_to_json</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vc</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+        <span class="n">doc</span><span class="p">[</span><span class="s">&#39;Frequencies&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">freqs</span>
+
+    <span class="k">if</span> <span class="n">do_column_summaries</span><span class="p">:</span>
+        <span class="n">col_summaries</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">col_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+            <span class="n">col_summary</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">col_summary</span><span class="p">[</span><span class="s">&#39;Mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col_name</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">col_summary</span><span class="p">[</span><span class="s">&#39;Sum&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col_name</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="n">col_summaries</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="o">=</span> <span class="n">col_summary</span>
+        <span class="n">doc</span><span class="p">[</span><span class="s">&#39;ColumnSummary&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">col_summaries</span>
+
+    <span class="k">if</span> <span class="n">do_row_summaries</span><span class="p">:</span>
+        <span class="n">row_summaries</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+            <span class="n">row_summary</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">row_summary</span><span class="p">[</span><span class="s">&#39;Sum&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">row_name</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="n">row_summaries</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="o">=</span> <span class="n">row_summary</span>
+        <span class="n">doc</span><span class="p">[</span><span class="s">&#39;RowSummary&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">row_summaries</span>
+
+    <span class="k">return</span> <span class="n">doc</span>
+
+</div>
+<div class="viewcode-block" id="levenshtein"><a class="viewcode-back" href="../../index.html#clintrials.util.levenshtein">[docs]</a><span class="k">def</span> <span class="nf">levenshtein</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; How &#39;far&#39; is string s1 from s2? Calculate the Levenshtein distance between two strings.</span>
+
+<span class="sd">    See http://en.wikipedia.org/wiki/Levenshtein_distance</span>
+
+<span class="sd">    :param s1: first string</span>
+<span class="sd">    :type s1: string</span>
+<span class="sd">    :param s2: second string</span>
+<span class="sd">    :type s2: string</span>
+<span class="sd">    :return: the Levenshtein distance</span>
+<span class="sd">    :rtype: int</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s1</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">s2</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">levenshtein</span><span class="p">(</span><span class="n">s2</span><span class="p">,</span> <span class="n">s1</span><span class="p">)</span>
+
+    <span class="c"># len(s1) &gt;= len(s2)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s2</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">s1</span><span class="p">)</span>
+
+    <span class="n">previous_row</span> <span class="o">=</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s2</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c1</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">s1</span><span class="p">):</span>
+        <span class="n">current_row</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">c2</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">s2</span><span class="p">):</span>
+            <span class="n">insertions</span> <span class="o">=</span> <span class="n">previous_row</span><span class="p">[</span><span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>  <span class="c"># j+1 instead of j since previous_row and current_row</span>
+                                                  <span class="c"># are one character longer</span>
+            <span class="n">deletions</span> <span class="o">=</span> <span class="n">current_row</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>        <span class="c"># than s2</span>
+            <span class="n">substitutions</span> <span class="o">=</span> <span class="n">previous_row</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">c1</span> <span class="o">!=</span> <span class="n">c2</span><span class="p">)</span>
+            <span class="n">current_row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">insertions</span><span class="p">,</span> <span class="n">deletions</span><span class="p">,</span> <span class="n">substitutions</span><span class="p">))</span>
+        <span class="n">previous_row</span> <span class="o">=</span> <span class="n">current_row</span>
+
+    <span class="k">return</span> <span class="n">previous_row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+</div>
+<div class="viewcode-block" id="levenshtein_index"><a class="viewcode-back" href="../../index.html#clintrials.util.levenshtein_index">[docs]</a><span class="k">def</span> <span class="nf">levenshtein_index</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Returns similarity score for strings s1 and s2 between 0 and 1 by dividing levenshtein score by greatest length.</span>
+
+<span class="sd">    This method uses :func:`clintrials.util.levenshtein`.</span>
+
+<span class="sd">    :param s1: first string</span>
+<span class="sd">    :type s1: string</span>
+<span class="sd">    :param s2: second string</span>
+<span class="sd">    :type s2: string</span>
+<span class="sd">    :return: Similarity index between 0 and 1</span>
+<span class="sd">    :rtype: float</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">l</span> <span class="o">=</span> <span class="n">levenshtein</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+    <span class="n">max_length</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">s2</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">max_length</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1.</span> <span class="o">*</span> <span class="n">l</span> <span class="o">/</span> <span class="n">max_length</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">0.0</span>
+
+</div>
+<div class="viewcode-block" id="support_match"><a class="viewcode-back" href="../../index.html#clintrials.util.support_match">[docs]</a><span class="k">def</span> <span class="nf">support_match</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Percentage score showing % of elements of a in b and b in a.</span>
+
+<span class="sd">    :param a: collection 1</span>
+<span class="sd">    :type a: iterable</span>
+<span class="sd">    :param b: collection 2</span>
+<span class="sd">    :type b: iterable</span>
+<span class="sd">    :return: Match score from 0.0 to 1.0</span>
+<span class="sd">    :rtype: float</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">a_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+        <span class="n">b_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+        <span class="n">a_in_b</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="ow">in</span> <span class="n">b_set</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">a_set</span><span class="p">]</span>
+        <span class="n">b_in_a</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="ow">in</span> <span class="n">a_set</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">b_set</span><span class="p">]</span>
+        <span class="k">return</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">a_in_b</span><span class="p">)</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span><span class="n">b_in_a</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a_set</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_set</span><span class="p">))</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">0.0</span>
+
+</div>
+<span class="k">def</span> <span class="nf">_correlated_binary_outcomes_mardia</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Helper function to correlated_binary_outcomes &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">a</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="o">-</span><span class="n">c</span> <span class="o">/</span> <span class="n">b</span>
+
+    <span class="k">if</span> <span class="n">b</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">elif</span> <span class="n">b</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">k</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">b</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">4</span><span class="o">*</span><span class="n">a</span><span class="o">*</span><span class="n">c</span><span class="p">))</span>
+    <span class="n">r1</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">*</span> <span class="n">p</span> <span class="o">/</span> <span class="n">a</span>
+    <span class="n">r2</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">*</span> <span class="n">c</span> <span class="o">/</span> <span class="n">p</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">r2</span> <span class="k">if</span> <span class="n">r2</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">r1</span>
+    <span class="k">return</span> <span class="n">r</span>
+
+
+<span class="k">def</span> <span class="nf">_correlated_binary_outcomes_solve2</span><span class="p">(</span><span class="n">mui</span><span class="p">,</span> <span class="n">muj</span><span class="p">,</span> <span class="n">psi</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">psi</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">mui</span><span class="o">*</span><span class="n">muj</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">psi</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">a</span> <span class="o">*</span> <span class="p">(</span><span class="n">mui</span> <span class="o">+</span> <span class="n">muj</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="o">-</span><span class="n">psi</span> <span class="o">*</span> <span class="p">(</span><span class="n">mui</span> <span class="o">*</span> <span class="n">muj</span><span class="p">)</span>
+        <span class="n">muij</span> <span class="o">=</span> <span class="n">_correlated_binary_outcomes_mardia</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">muij</span>
+
+
+<div class="viewcode-block" id="correlated_binary_outcomes"><a class="viewcode-back" href="../../index.html#clintrials.util.correlated_binary_outcomes">[docs]</a><span class="k">def</span> <span class="nf">correlated_binary_outcomes</span><span class="p">(</span><span class="n">num_pairs</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">psi</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Randomly sample correlated binary digits, copying the method from R-package ranBin2.</span>
+
+<span class="sd">    :param num_pairs: number of pairs</span>
+<span class="sd">    :type num_pairs: int</span>
+<span class="sd">    :param u: 2-item list/tuple of event probabilities</span>
+<span class="sd">    :type u: list or tuple</span>
+<span class="sd">    :param psi: odds ratio of the binary outcomes</span>
+<span class="sd">    :type psi: float</span>
+<span class="sd">    :param seed: optional seed for reproducible randomness</span>
+<span class="sd">    :type seed: int</span>
+<span class="sd">    :return: ndarray of paired binary digits, 2 columns and num_pairs rows</span>
+<span class="sd">    :rtype: numpy.ndarray</span>
+
+<span class="sd">    .. note:: The Bonett article at http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</span>
+<span class="sd">                details Yule&#39;s method (1912) for estimating correlation from odds ratio and vice-versa.</span>
+<span class="sd">                If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and</span>
+<span class="sd">                OR = ((1+r) / (1-r))**2</span>
+<span class="sd">                provide decent approximations.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">seed</span><span class="p">:</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="n">u12</span> <span class="o">=</span> <span class="n">_correlated_binary_outcomes_solve2</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">psi</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_pairs</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">num_pairs</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">y</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">num_pairs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">u12</span><span class="o">/</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> \
+                        <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">num_pairs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">u12</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="n">y</span>
+
+</div>
+<div class="viewcode-block" id="correlated_binary_outcomes_from_uniforms"><a class="viewcode-back" href="../../index.html#clintrials.util.correlated_binary_outcomes_from_uniforms">[docs]</a><span class="k">def</span> <span class="nf">correlated_binary_outcomes_from_uniforms</span><span class="p">(</span><span class="n">unifs</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">psi</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Create correlated binary outcomes from observed n*3 array of uniforms, tweaking method from R-package ranBin2.</span>
+
+<span class="sd">    :param unifs: array of shape (n, 3) of uniforms between 0 and 1</span>
+<span class="sd">    :type unifs: numpy.ndarray</span>
+<span class="sd">    :param u: 2-item list/tuple of event probabilities</span>
+<span class="sd">    :type u: list or tuple</span>
+<span class="sd">    :param psi: odds ratio of the binary outcomes</span>
+<span class="sd">    :type psi: float</span>
+<span class="sd">    :return: ndarray of paired binary digits, 2 columns and num_pairs rows</span>
+<span class="sd">    :rtype: numpy.ndarray</span>
+
+<span class="sd">    .. note:: The Bonett article at http://psych.colorado.edu/~willcutt/pdfs/Bonett_2007.pdf</span>
+<span class="sd">                details Yule&#39;s method (1912) for estimating correlation from odds ratio and vice-versa.</span>
+<span class="sd">                If the two proportions in u are close, r = (sqrt(OR) - 1) / (sqrt(OR) + 1), and</span>
+<span class="sd">                OR = ((1+r) / (1-r))**2</span>
+<span class="sd">                provide decent approximations.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">unifs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">unifs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">u12</span> <span class="o">=</span> <span class="n">_correlated_binary_outcomes_solve2</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">psi</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">unifs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">unifs</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">y</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">unifs</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">u12</span><span class="o">/</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">unifs</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">u12</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">y</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;unifs must be an n*3 array&#39;</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="get_proportion_confint_report"><a class="viewcode-back" href="../../index.html#clintrials.util.get_proportion_confint_report">[docs]</a><span class="k">def</span> <span class="nf">get_proportion_confint_report</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">do_normal</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">do_agresti_coull</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+                                  <span class="n">do_beta</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">do_wilson</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">do_jeffrey</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">do_binom_test</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Get confidence intervals of proportion num_successes / num_trials using different methods in JSON-friendly form.</span>
+
+<span class="sd">    :param num_successes: number of successes</span>
+<span class="sd">    :type num_successes: int</span>
+<span class="sd">    :param num_trials: number of trials or attempts</span>
+<span class="sd">    :type num_trials: int</span>
+<span class="sd">    :param alpha: significance used in statistical inferences</span>
+<span class="sd">    :type alpha: float</span>
+<span class="sd">    :param do_normal: True to get a confidence interval using the normal approximation method</span>
+<span class="sd">    :type do_normal: bool</span>
+<span class="sd">    :param do_agresti_coull: True to get a confidence interval using the Agresti-Coull method</span>
+<span class="sd">    :type do_agresti_coull: bool</span>
+<span class="sd">    :param do_beta: True to get a confidence interval using the beta method</span>
+<span class="sd">    :type do_beta: bool</span>
+<span class="sd">    :param do_wilson: True to get a confidence interval using the Wilson method</span>
+<span class="sd">    :type do_wilson: bool</span>
+<span class="sd">    :param do_jeffrey: True to get a confidence interval using the Jeffrey method</span>
+<span class="sd">    :type do_jeffrey: bool</span>
+<span class="sd">    :param do_binom_test: True to get a confidence interval using the binomial test method</span>
+<span class="sd">    :type do_binom_test: bool</span>
+<span class="sd">    :return: JSON-able dict report</span>
+<span class="sd">    :rtype: dict</span>
+
+<span class="sd">    Why do I use normal, agresti_coull and wilson by default?</span>
+
+<span class="sd">    1) Normal, because it is the widely-used but flawed option.</span>
+<span class="sd">    2) AgrestiCoull &amp; Wilson, because Lawrence D. Brown, T. Tony Cai and Anirban DasGupta in their paper</span>
+<span class="sd">        `Interval Estimation for a Binomial Proportion` say &#39;we recommend the Wilson interval for small n and the</span>
+<span class="sd">        interval suggested in Agresti and Coull for larger n&#39;</span>
+
+<span class="sd">    Call to proportion_confint allows methods:</span>
+
+<span class="sd">    - `normal` : asymptotic normal approximation</span>
+<span class="sd">    - `agresti_coull` : Agresti-Coull interval</span>
+<span class="sd">    - `beta` : Clopper-Pearson interval based on Beta distribution</span>
+<span class="sd">    - `wilson` : Wilson Score interval</span>
+<span class="sd">    - `jeffrey` : Jeffrey&#39;s Bayesian Interval</span>
+<span class="sd">    - `binom_test`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">conf_int_reports</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">do_normal</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;normal&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;Normal&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;Normal&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">if</span> <span class="n">do_agresti_coull</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;agresti_coull&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;AgrestiCoull&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;AgrestiCoull&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">if</span> <span class="n">do_beta</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;beta&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;Beta&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;Beta&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">if</span> <span class="n">do_wilson</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;wilson&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;Wilson&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;Wilson&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">if</span> <span class="n">do_jeffrey</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;jeffrey&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;Jeffrey&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;Jeffrey&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">if</span> <span class="n">do_binom_test</span><span class="p">:</span>
+        <span class="n">conf_int</span> <span class="o">=</span> <span class="n">proportion_confint</span><span class="p">(</span><span class="n">num_successes</span><span class="p">,</span> <span class="n">num_trials</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;binom_test&#39;</span><span class="p">)</span>
+        <span class="n">conf_int_report</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="n">conf_int_report</span><span class="p">[</span><span class="s">&#39;Method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;BinomTest&#39;</span>
+        <span class="n">conf_int_reports</span><span class="p">[</span><span class="s">&#39;BinomTest&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf_int_report</span>
+
+    <span class="k">return</span> <span class="n">conf_int_reports</span>
+
+</div>
+<div class="viewcode-block" id="cross_tab"><a class="viewcode-back" href="../../index.html#clintrials.util.cross_tab">[docs]</a><span class="k">def</span> <span class="nf">cross_tab</span><span class="p">(</span><span class="n">col_row_pairs</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">to_json</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">do_value_counts</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Cross-tabulate counts of data pairs.</span>
+
+<span class="sd">    :param col_row_pairs: list of 2-tuples, (col item, row item), e.g.</span>
+<span class="sd">                            [(&#39;1&#39;, &#39;Related&#39;), (&#39;2&#39;, &#39;Unrelated&#39;), (&#39;2&#39;, &#39;Related&#39;)]</span>
+<span class="sd">    :type col_row_pairs: list</span>
+<span class="sd">    :param cols: list of col-headers. Distinct items will be used if omitted.</span>
+<span class="sd">    :type cols: list</span>
+<span class="sd">    :param rows: list of row-headers. Distinct items will be used if omitted and rows will be sorted by row-wise totals.</span>
+<span class="sd">    :type rows: list</span>
+<span class="sd">    :param to_json: True to return JSON-able object; False to get a pandas.DataFrame</span>
+<span class="sd">    :type to_json: bool</span>
+<span class="sd">    :param do_value_counts: True to return value counts</span>
+<span class="sd">    :type do_value_counts: bool</span>
+<span class="sd">    :return: pivottable-style cross tabulation</span>
+<span class="sd">    :rtype: dict of pandas.DataFrame</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">col_data</span><span class="p">,</span> <span class="n">row_data</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">col_row_pairs</span><span class="p">)</span>
+    <span class="n">row_h</span> <span class="o">=</span> <span class="n">rows</span> <span class="k">if</span> <span class="n">rows</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">row_data</span><span class="p">))</span>
+    <span class="n">col_h</span> <span class="o">=</span> <span class="n">cols</span> <span class="k">if</span> <span class="n">cols</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">col_data</span><span class="p">))</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">row_h</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">col_h</span><span class="p">)))</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">row_h</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">col_h</span><span class="p">):</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span> <span class="o">==</span> <span class="n">c</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">col_data</span><span class="p">])</span> <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span> <span class="o">==</span> <span class="n">r</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">row_data</span><span class="p">]))</span>
+            <span class="n">counts</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span>
+    <span class="n">df_n</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">row_h</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">col_h</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="n">row_order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="o">-</span><span class="n">df_n</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">df_n</span> <span class="o">=</span> <span class="n">df_n</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">row_order</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">to_json</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df_to_json</span><span class="p">(</span><span class="n">df_n</span><span class="p">,</span> <span class="n">do_value_counts</span><span class="o">=</span><span class="n">do_value_counts</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df_n</span>
+
+</div>
+<div class="viewcode-block" id="Memoize"><a class="viewcode-back" href="../../index.html#clintrials.util.Memoize">[docs]</a><span class="k">class</span> <span class="nc">Memoize</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; Class to transparently cache function results by their runtime args</span>
+
+<span class="sd">    E.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; f = lambda x: x**3</span>
+<span class="sd">    &gt;&gt;&gt; f = Memoize(f)</span>
+<span class="sd">    &gt;&gt;&gt; f(2.0) # Result is calculated and cached</span>
+<span class="sd">    8.0</span>
+<span class="sd">    &gt;&gt;&gt; f(2.0) # Result is fetched from cache</span>
+<span class="sd">    8.0</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f</span> <span class="o">=</span> <span class="n">f</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memo</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">[</span><span class="n">args</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">[</span><span class="n">args</span><span class="p">]</span>
+
+</div>
+<div class="viewcode-block" id="ParameterSpace"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace">[docs]</a><span class="k">class</span> <span class="nc">ParameterSpace</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; Class to handle combinations of parameters (i.e. a parameter space) in simulations. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ParameterSpace.add"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace.add">[docs]</a>    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Add a variable and a list of all values the variable may take.</span>
+
+<span class="sd">        :param label: variable label or name</span>
+<span class="sd">        :type label: str</span>
+<span class="sd">        :param values: list of values that variable may take</span>
+<span class="sd">        :type values: list</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span>
+</div>
+<div class="viewcode-block" id="ParameterSpace.sample"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace.sample">[docs]</a>    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Randomly fetch a value for variable with label.</span>
+
+<span class="sd">        :param label: variable label or name</span>
+<span class="sd">        :type label: str</span>
+<span class="sd">        :return: randomly-sampled value</span>
+<span class="sd">        :rtype: object</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">label</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">vals</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">)))]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+</div>
+<div class="viewcode-block" id="ParameterSpace.sample_all"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace.sample_all">[docs]</a>    <span class="k">def</span> <span class="nf">sample_all</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Randomly sample a value for each variable, returned as a map from label to value.</span>
+
+<span class="sd">        :return: a randomly sampled set of parameter values</span>
+<span class="sd">        :rtype: dict</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">sampled</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">:</span>
+            <span class="n">sampled</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sampled</span>
+</div>
+<div class="viewcode-block" id="ParameterSpace.get_cyclical_iterator"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace.get_cyclical_iterator">[docs]</a>    <span class="k">def</span> <span class="nf">get_cyclical_iterator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">limit</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get iterator to **deterministically** cycle the possible parameter perumtations, optionally forever.</span>
+
+<span class="sd">        :param limit: -1 to iterate cyclically forever, else maximum number of elements to iterate through.</span>
+<span class="sd">        :type limit: int</span>
+<span class="sd">        :return: an iterable object</span>
+<span class="sd">        :rtype: iterable</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="n">_ParameterSpaceIter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="ParameterSpace.keys"><a class="viewcode-back" href="../../index.html#clintrials.util.ParameterSpace.keys">[docs]</a>    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get parameter space keys, i.e. the variable names</span>
+
+<span class="sd">        :return: Collection of keys</span>
+<span class="sd">        :rtype: iterable</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+</div>
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+</div>
+<span class="k">class</span> <span class="nc">_ParameterSpaceIter</span><span class="p">():</span>
+
+        <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameter_space</span><span class="p">,</span> <span class="n">limit</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">limit</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">parameter_space</span><span class="o">.</span><span class="n">vals_map</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+            <span class="n">num_options</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">:</span>
+                <span class="n">num_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">parameter_space</span><span class="p">[</span><span class="n">label</span><span class="p">]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">num_options</span><span class="p">]))</span>
+            <span class="c">#print zip(labels, num_options)</span>
+
+        <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">StopIteration</span><span class="p">()</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">param_map</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">):</span>
+                <span class="n">param_map</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vals_map</span><span class="p">[</span><span class="n">label</span><span class="p">][</span><span class="n">path</span><span class="p">[</span><span class="n">j</span><span class="p">]]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="n">param_map</span>
+
+
+
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">doctest</span>
+    <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2014, Kristian Brock.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,379 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>clintrials.recruitment &mdash; clintrials 0.1.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="clintrials 0.1.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for clintrials.recruitment</h1><div class="highlight"><pre>
+<span class="n">__author__</span> <span class="o">=</span> <span class="s">&#39;Kristian Brock&#39;</span>
+<span class="n">__contact__</span> <span class="o">=</span> <span class="s">&#39;kristian.brock@gmail.com&#39;</span>
+
+
+<span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+
+<span class="sd">&quot;&quot;&quot; Classes and functions for modelling recruitment to clinical trials. &quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="RecruitmentStream"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.RecruitmentStream">[docs]</a><span class="k">class</span> <span class="nc">RecruitmentStream</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="n">__metaclass__</span> <span class="o">=</span> <span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span>
+
+    <span class="nd">@abc.abstractmethod</span>
+<div class="viewcode-block" id="RecruitmentStream.reset"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.RecruitmentStream.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Reset the recruitment stream to start anew.</span>
+
+<span class="sd">        :return: None</span>
+<span class="sd">        :rtype: None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+</div>
+    <span class="nd">@abc.abstractmethod</span>
+<div class="viewcode-block" id="RecruitmentStream.next"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.RecruitmentStream.next">[docs]</a>    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get the time that the next patient is recruited.</span>
+
+<span class="sd">        :return: The time that the next patient is recruited.</span>
+<span class="sd">        :rtype: float</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+</div></div>
+<div class="viewcode-block" id="ConstantRecruitmentStream"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.ConstantRecruitmentStream">[docs]</a><span class="k">class</span> <span class="nc">ConstantRecruitmentStream</span><span class="p">(</span><span class="n">RecruitmentStream</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Recruitment stream where the intrapatient wait is constant.</span>
+
+<span class="sd">    This is the simplest recruitment stream case. A patient arrives every delta units of time.</span>
+
+<span class="sd">    E.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; s = ConstantRecruitmentStream(2.5)</span>
+<span class="sd">    &gt;&gt;&gt; s.next()</span>
+<span class="sd">    2.5</span>
+<span class="sd">    &gt;&gt;&gt; s.next()</span>
+<span class="sd">    5.0</span>
+<span class="sd">    &gt;&gt;&gt; s.next()</span>
+<span class="sd">    7.5</span>
+<span class="sd">    &gt;&gt;&gt; s.reset()</span>
+<span class="sd">    &gt;&gt;&gt; s.next()</span>
+<span class="sd">    2.5</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ConstantRecruitmentStream.__init__"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.ConstantRecruitmentStream.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intrapatient_gap</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Create instance</span>
+
+<span class="sd">        :param intrapatient_gap: the gap between recruitment times, aka delta.</span>
+<span class="sd">        :type intrapatient_gap: float</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="n">intrapatient_gap</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+</div>
+<div class="viewcode-block" id="ConstantRecruitmentStream.reset"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.ConstantRecruitmentStream.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Reset the recruitment stream to start anew.</span>
+
+<span class="sd">        :return: None</span>
+<span class="sd">        :rtype: None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+</div>
+<div class="viewcode-block" id="ConstantRecruitmentStream.next"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.ConstantRecruitmentStream.next">[docs]</a>    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get the time that the next patient is recruited.</span>
+
+<span class="sd">        :return: The time that the next patient is recruited.</span>
+<span class="sd">        :rtype: float</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span>
+
+</div></div>
+<div class="viewcode-block" id="QuadrilateralRecruitmentStream"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.QuadrilateralRecruitmentStream">[docs]</a><span class="k">class</span> <span class="nc">QuadrilateralRecruitmentStream</span><span class="p">(</span><span class="n">RecruitmentStream</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Recruitment stream that allows recruitment potential to vary as a function of time using vertices.</span>
+<span class="sd">    Between two vertices, recruitment potential is represented by areas of quadrilaterals. Recruitment potential</span>
+<span class="sd">    may change linearly using interpolation, or instantananeously using steps. In the former case, the quadrilaterals</span>
+<span class="sd">    are trapeziums; in the latter, rectangles.</span>
+
+<span class="sd">    I started by calling this class DampenedRecruitmentStream because recruitment typically opens at something</span>
+<span class="sd">    like 50% potency where half recruitment centres are open and then increases linearly to 100% after about a year.</span>
+<span class="sd">    However, I settled on the name QuadrilateralRecruitmentStream because of the important role quadrilaterals play in</span>
+<span class="sd">    calculating the cumulative recruitment mass between two times.</span>
+
+<span class="sd">    Let&#39;s do an example. Imagine a hypothetical trial that will recruit using several recruitment centres. When all</span>
+<span class="sd">    recruitment centres are open, the trial expects to recruit a patient every four days, thus the intrapatient gap</span>
+<span class="sd">    is 4.0. The trial will open with initial recruitment potential of 50% (i.e. half of the recruiting sites are open).</span>
+<span class="sd">    Recruitment potential is expected to reach 100% after 20 days, linearly increasing from 50% to 100% over the first</span>
+<span class="sd">    20 days, i.e. recruitment centres will be continually opened at a constant rate. The first patient will be recruited</span>
+<span class="sd">    at time t where t satisfies the integral equation</span>
+
+<span class="sd">    :math:`\\int_0^t 0.5 + \\frac{1.0 - 0.5}{20 - 0}s  ds = \\int_0^t 0.5 + \\frac{s}{40} ds</span>
+<span class="sd">    = \\frac{t}{2} + \\frac{t^2}{80} = 4`</span>
+
+<span class="sd">    i.e. solving the quadratic</span>
+
+<span class="sd">    :math:`t = \\frac{-\\frac{1}{2} + \\sqrt{\\frac{1}{2}^2 - 4 \\times \\frac{1}{80} \\times -4}}{\\frac{2}{80}}</span>
+<span class="sd">    = 6.83282`</span>
+
+<span class="sd">    , and so on. The root of the quadratic yielded by :math:`-b - \\sqrt{b^2-4ac}` is ignored because it makes no sense.</span>
+
+<span class="sd">    E.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; s1 = QuadrilateralRecruitmentStream(4.0, 0.5, [(20, 1.0)], interpolate=True)</span>
+<span class="sd">    &gt;&gt;&gt; s1.next()</span>
+<span class="sd">    6.8328157299974768</span>
+<span class="sd">    &gt;&gt;&gt; s1.next()</span>
+<span class="sd">    12.2490309931942</span>
+<span class="sd">    &gt;&gt;&gt; s1.next()</span>
+<span class="sd">    16.878177829171548</span>
+<span class="sd">    &gt;&gt;&gt; s1.next()</span>
+<span class="sd">    21.0</span>
+<span class="sd">    &gt;&gt;&gt; s1.next()</span>
+<span class="sd">    25.0</span>
+
+<span class="sd">    Now, let&#39;s consider the same scenario again, with stepped transition rather than interpolated transition. In this</span>
+<span class="sd">    scenario, a patient is recruited after each 4 / 0.5 = 8 days for times from 0 to 20 when recruitment potential is</span>
+<span class="sd">    at 50%. After time=20, a patient is recruited after every 4 days because recruitment potential is at 100%. For the</span>
+<span class="sd">    patient that straddles the time t=20, the time to recruit is 4 days at 50% potential plus 2 days at 100% = 4 days,</span>
+<span class="sd">    as required.</span>
+
+<span class="sd">    E.g.</span>
+
+<span class="sd">    &gt;&gt;&gt; s2 = QuadrilateralRecruitmentStream(4.0, 0.5, [(20, 1.0)], interpolate=False)</span>
+<span class="sd">    &gt;&gt;&gt; s2.next()</span>
+<span class="sd">    8.0</span>
+<span class="sd">    &gt;&gt;&gt; s2.next()</span>
+<span class="sd">    16.0</span>
+<span class="sd">    &gt;&gt;&gt; s2.next()</span>
+<span class="sd">    22.0</span>
+<span class="sd">    &gt;&gt;&gt; s2.next()</span>
+<span class="sd">    26.0</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QuadrilateralRecruitmentStream.__init__"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.QuadrilateralRecruitmentStream.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intrapatient_gap</span><span class="p">,</span> <span class="n">initial_intensity</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">interpolate</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Create instance</span>
+
+<span class="sd">        :param intrapatient_gap: time to recruit one patient at 100% recruitment intensity, i.e. the gap between</span>
+<span class="sd">                                    recruitment times when recruitment is at 100% intensity.</span>
+<span class="sd">        :type intrapatient_gap: float</span>
+<span class="sd">        :param initial_intensity: recruitment commences at this % of total power.</span>
+<span class="sd">                                    E.g. if it takes 2 days to recruit a patient at full recruitment power,</span>
+<span class="sd">                                            at intensity 0.1 it will take 20 days to recruit a patient.</span>
+<span class="sd">                                    TODO: zero? negative?</span>
+<span class="sd">        :type initial_intensity: float</span>
+<span class="sd">        :param vertices: list of additional vertices as (time t, intensity r) tuples, where recruitment power is r% at t</span>
+<span class="sd">                        Recruitment intensity is linearly extrapolated between vertex times, including the origin, t=0.</span>
+<span class="sd">                        .. note::</span>
+<span class="sd">                        - intensity can dampen (e.g. intensity=50%) or amplify (e.g. intensity=150%) average recruitment;</span>
+<span class="sd">                        - intensity should not be negative. Any negative values will yield a TypeError</span>
+<span class="sd">        :type vertices: list of (float, float) tuples</span>
+<span class="sd">        :param interpolate: True to linearly interpolate between vertices; False to use steps.</span>
+<span class="sd">        :type interpolate: bool</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="n">intrapatient_gap</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_intensity</span> <span class="o">=</span> <span class="n">initial_intensity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">interpolate</span> <span class="o">=</span> <span class="n">interpolate</span>
+
+        <span class="n">v</span> <span class="o">=</span> <span class="n">vertices</span>
+        <span class="n">v</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c"># t1 -&gt; t0, t1, y0, y1 vertex parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recruiment_mass</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c"># t1 -&gt; recruitment mass available (i.e. area of quadrilateral) to left of t1</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">t0</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">y0</span> <span class="o">=</span> <span class="n">initial_intensity</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">v</span><span class="p">:</span>
+                <span class="n">t1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">x</span>
+                <span class="k">if</span> <span class="n">interpolate</span><span class="p">:</span>
+                    <span class="n">mass</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">y0</span><span class="o">+</span><span class="n">y1</span><span class="p">)</span>  <span class="c"># Area of trapezium</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">mass</span> <span class="o">=</span> <span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span> <span class="o">*</span> <span class="n">y0</span>  <span class="c"># Are of rectangle</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recruiment_mass</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span> <span class="o">=</span> <span class="n">mass</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">)</span>
+                <span class="n">t0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">recruiment_mass</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+</div>
+<div class="viewcode-block" id="QuadrilateralRecruitmentStream.reset"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.QuadrilateralRecruitmentStream.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Reset the recruitment stream to start anew.</span>
+
+<span class="sd">        :return: None</span>
+<span class="sd">        :rtype: None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">recruiment_mass</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="QuadrilateralRecruitmentStream.next"><a class="viewcode-back" href="../../index.html#clintrials.recruitment.QuadrilateralRecruitmentStream.next">[docs]</a>    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get the time that the next patient is recruited.</span>
+
+<span class="sd">        :return: The time that the next patient is recruited.</span>
+<span class="sd">        :rtype: float</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">sought_mass</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">t1</span> <span class="ow">in</span> <span class="n">t</span><span class="p">:</span>
+            <span class="n">avail_mass</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span>
+            <span class="n">t0</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">avail_mass</span> <span class="o">&gt;=</span> <span class="n">sought_mass</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interpolate</span><span class="p">:</span>
+                    <span class="n">y_at_cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_linearly_interpolate_y</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">)</span>
+                    <span class="n">new_cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_invert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y_at_cursor</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">sought_mass</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="n">new_cursor</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">y_at_cursor</span> <span class="o">=</span> <span class="n">y0</span>
+                    <span class="n">new_cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_invert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y_at_cursor</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">sought_mass</span><span class="p">,</span> <span class="n">as_rectangle</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="n">new_cursor</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">sought_mass</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sought_mass</span> <span class="o">-=</span> <span class="n">avail_mass</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">available_mass</span><span class="p">[</span><span class="n">t1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="k">if</span> <span class="n">t1</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="n">t1</span>
+
+        <span class="c"># Got here? Satisfy outstanding sought mass using terminal recruitment intensity</span>
+        <span class="n">terminal_rate</span> <span class="o">=</span> <span class="n">y1</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_intensity</span>
+        <span class="k">if</span> <span class="n">terminal_rate</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">+=</span> <span class="n">sought_mass</span> <span class="o">/</span> <span class="n">terminal_rate</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+</div>
+    <span class="k">def</span> <span class="nf">_linearly_interpolate_y</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Linearly interpolate y-value at t using line through (t0, y0) and (t1, y1) &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">t1</span> <span class="o">==</span> <span class="n">t0</span><span class="p">:</span>
+            <span class="c"># The line either has infiniite gradient or is not a line at all, but a point. No logical response</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="p">(</span><span class="n">y1</span><span class="o">-</span><span class="n">y0</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">m</span> <span class="o">*</span> <span class="p">(</span><span class="n">t</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_invert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">as_rectangle</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns time t at which the area of quadrilateral with vertices at t0, t, f(t), f(t0) equals mass. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">t1</span> <span class="o">==</span> <span class="n">t0</span><span class="p">:</span>
+            <span class="c"># The quadrilateral has no area</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="k">elif</span> <span class="n">y0</span> <span class="o">==</span> <span class="n">y1</span> <span class="ow">and</span> <span class="n">y0</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c"># The quadrilateral has no area or is badly defined</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">y0</span> <span class="o">==</span> <span class="n">y1</span> <span class="ow">and</span> <span class="n">y0</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="n">as_rectangle</span><span class="p">:</span>
+            <span class="c"># We require area of a rectangle; easy!</span>
+            <span class="k">return</span> <span class="n">t0</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="n">mass</span> <span class="o">/</span> <span class="n">y0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c"># We require area of a trapezium. That requires solving a quadratic.</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="p">(</span><span class="n">y1</span><span class="o">-</span><span class="n">y0</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span>
+            <span class="n">discriminant</span> <span class="o">=</span> <span class="n">y0</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">m</span> <span class="o">*</span> <span class="n">mass</span>
+            <span class="k">if</span> <span class="n">discriminant</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s">&#39;Discriminant is negative&#39;</span><span class="p">)</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">discriminant</span><span class="p">)</span>
+            <span class="n">tau0</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">y0</span> <span class="o">+</span> <span class="n">z</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+            <span class="n">tau1</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">y0</span> <span class="o">-</span> <span class="n">z</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+            <span class="k">if</span> <span class="n">tau0</span> <span class="o">+</span> <span class="n">t0</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">t0</span> <span class="o">+</span> <span class="n">tau0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">assert</span><span class="p">(</span><span class="n">t0</span> <span class="o">+</span> <span class="n">tau1</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">t0</span> <span class="o">+</span> <span class="n">tau1</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">clintrials 0.1.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2014, Kristian Brock.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

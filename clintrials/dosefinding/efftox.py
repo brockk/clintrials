@@ -567,6 +567,112 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                                                                              self.tox_cutoff, self.eff_cutoff)
         return obd
 
+    def scaled_doses(self):
+        return self._scaled_doses
+
+    def _post_density_plot(self, func=None, x_name='', plot_title='', include_doses=None, boot_samps=1000):
+
+        from ggplot import aes, ggplot, geom_density, ggtitle
+        import pandas as pd
+
+        if include_doses is None:
+            include_doses = range(1, self.num_doses + 1)
+
+        def my_func(x, samp):
+            tox_probs = _pi_T(x, mu=samp[:, 0], beta=samp[:, 1])
+            eff_probs = _pi_E(x, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+            u = self.metric(eff_probs, tox_probs)
+            return u
+        if func is None:
+            func = my_func
+
+        x_boot = []
+        dose_indices = []
+        samp = self.pds._samp
+        p = self.pds._probs
+        p /= p.sum()
+        for i, x in enumerate(self.scaled_doses()):
+            dose_index = i+1
+            if dose_index in include_doses:
+                x = func(x, samp)
+                # tox_probs = _pi_T(x, mu=samp[:, 0], beta=samp[:, 1])
+                # eff_probs = _pi_E(x, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+                # u = self.metric(eff_probs, tox_probs)
+                x_boot.extend(np.random.choice(x, size=boot_samps, replace=True, p=p))
+                dose_indices.extend(np.repeat(dose_index, boot_samps))
+        df = pd.DataFrame({x_name: x_boot, 'Dose': dose_indices})
+        return ggplot(aes(x=x_name, fill='Dose'), data=df) + geom_density(alpha=0.6) + ggtitle(plot_title)
+
+    def plot_posterior_tox_prob_density(self, include_doses=None):
+        """ Plot the posterior densities of the dose probabilities of toxicity.
+
+        .. note:: this method uses ggplot so that must be available on your system.
+        Why ggplot and not matplotlib? Because I also use R so I prefer the commonality of ggplot.
+        The length of time this method takes will be linked to number of points in last call to update().
+        It is relatively slow so don't go nuts.
+
+        :param include_doses: optional, list of dose levels to include, e.g. [1,2]. Default is None for all doses.
+        :type include_doses: list
+        :return: ggplot device
+        :rtype: ggplot
+
+        """
+
+        def get_prob_tox(x, samp):
+            tox_probs = _pi_T(x, mu=samp[:, 0], beta=samp[:, 1])
+            return tox_probs
+
+        return self._post_density_plot(func=get_prob_tox, x_name='Prob(Toxicity)',
+                                       plot_title='Posterior densities of Prob(Toxicity)',
+                                       include_doses=include_doses)
+
+    def plot_posterior_eff_prob_density(self, include_doses=None):
+        """ Plot the posterior densities of the dose probabilities of efficacy.
+
+        .. note:: this method uses ggplot so that must be available on your system.
+        Why ggplot and not matplotlib? Because I also use R so I prefer the commonality of ggplot.
+        The length of time this method takes will be linked to number of points in last call to update().
+        It is relatively slow so don't go nuts.
+
+        :param include_doses: optional, list of dose levels to include, e.g. [1,2]. Default is None for all doses.
+        :type include_doses: list
+        :return: ggplot device
+        :rtype: ggplot
+
+        """
+
+        def get_prob_eff(x, samp):
+            eff_probs = _pi_E(x, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+            return eff_probs
+
+        return self._post_density_plot(func=get_prob_eff, x_name='Prob(Efficacy)',
+                                       plot_title='Posterior densities of Prob(Efficacy)',
+                                       include_doses=include_doses)
+
+    def plot_posterior_utility_density(self, include_doses=None):
+        """ Plot the posterior densities of the dose utilities.
+
+        .. note:: this method uses ggplot so that must be available on your system.
+        Why ggplot and not matplotlib? Because I also use R so I prefer the commonality of ggplot.
+        The length of time this method takes will be linked to number of points in last call to update().
+        It is relatively slow so don't go nuts.
+
+        :param include_doses: optional, list of dose levels to include, e.g. [1,2]. Default is None for all doses.
+        :type include_doses: list
+        :return: ggplot device
+        :rtype: ggplot
+
+        """
+
+        def get_utility(x, samp):
+            tox_probs = _pi_T(x, mu=samp[:, 0], beta=samp[:, 1])
+            eff_probs = _pi_E(x, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+            u = self.metric(eff_probs, tox_probs)
+            return u
+
+        return self._post_density_plot(func=get_utility, x_name='Utility', plot_title='Posterior densities of Utility',
+                                       include_doses=include_doses)
+
 
 def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):
     """ Solve a metrizable efficacy-toxicity dose-finding scenario.

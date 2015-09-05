@@ -14,7 +14,7 @@ from scipy.optimize import fsolve
 from scipy.stats import norm, binom, uniform
 
 from clintrials.phase2 import Phase2EffToxBase
-from clintrials.stats import chi_squ_test, or_test
+from clintrials.stats import chi_squ_test, or_test, ProbabilityDensitySample
 from clintrials.util import correlated_binary_outcomes, atomic_to_json, iterable_to_json
 
 
@@ -50,30 +50,6 @@ def l_n(D, alpha0, beta0, beta1, beta2, psi) :
         return response
     else:
         return np.ones_like(alpha0)
-
-
-class ProbabilityDensitySample:
-
-    def __init__(self, samp, func):
-        self._samp = samp
-        self._probs = func(samp)
-        self._scale = self._probs.mean()
-
-    def expectation(self, vector):
-        return np.mean(vector * self._probs / self._scale)
-
-    def variance(self, vector):
-        exp = self.expectation(vector)
-        exp2 = self.expectation(vector**2)
-        return exp2 - exp**2
-
-    def cdf(self, i, y):
-        """ Get the cumulative density of the parameter in position i that is less than y. """
-        return self.expectation(self._samp[:,i]<y)
-
-    def quantile(self, i, p):
-        """ Get the value of the parameter at position i for which p of the probability mass is in the left-tail. """
-        return fsolve(lambda z: self.cdf(i, z) - p, 0.1)[0]
 
 
 def get_posterior_probs(D, priors, tox_cutoffs, eff_cutoffs, n=10**5):

@@ -603,7 +603,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         df = pd.DataFrame({x_name: x_boot, 'Dose': dose_indices})
         return ggplot(aes(x=x_name, fill='Dose'), data=df) + geom_density(alpha=0.6) + ggtitle(plot_title)
 
-    def plot_posterior_tox_prob_density(self, include_doses=None):
+    def plot_posterior_tox_prob_density(self, include_doses=None, boot_samps=1000):
         """ Plot the posterior densities of the dose probabilities of toxicity.
 
         .. note:: this method uses ggplot so that must be available on your system.
@@ -624,9 +624,9 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         return self._post_density_plot(func=get_prob_tox, x_name='Prob(Toxicity)',
                                        plot_title='Posterior densities of Prob(Toxicity)',
-                                       include_doses=include_doses)
+                                       include_doses=include_doses, boot_samps=boot_samps)
 
-    def plot_posterior_eff_prob_density(self, include_doses=None):
+    def plot_posterior_eff_prob_density(self, include_doses=None, boot_samps=1000):
         """ Plot the posterior densities of the dose probabilities of efficacy.
 
         .. note:: this method uses ggplot so that must be available on your system.
@@ -647,9 +647,9 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         return self._post_density_plot(func=get_prob_eff, x_name='Prob(Efficacy)',
                                        plot_title='Posterior densities of Prob(Efficacy)',
-                                       include_doses=include_doses)
+                                       include_doses=include_doses, boot_samps=boot_samps)
 
-    def plot_posterior_utility_density(self, include_doses=None):
+    def plot_posterior_utility_density(self, include_doses=None, boot_samps=1000):
         """ Plot the posterior densities of the dose utilities.
 
         .. note:: this method uses ggplot so that must be available on your system.
@@ -671,7 +671,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
             return u
 
         return self._post_density_plot(func=get_utility, x_name='Utility', plot_title='Posterior densities of Utility',
-                                       include_doses=include_doses)
+                                       include_doses=include_doses, boot_samps=boot_samps)
 
 
 def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):

@@ -2,6 +2,7 @@ __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
 
+from collections import OrderedDict
 from datetime import datetime
 import glob
 import itertools
@@ -102,6 +103,7 @@ def go_fetch_json_sims(file_pattern):
     print 'Fetched', len(sims), 'sims'
     return sims
 
+
 def filter_sims(sims, filter):
     """ Filter a list of simulations.
 
@@ -175,3 +177,139 @@ def summarise_sims(sims, ps, func_map, var_map=None, to_pandas=True):
         else:
             # TODO
             return [], []
+
+
+# Map-Reduce methods for summairsing sims in memory-efficient ways
+def map_reduce_sims(sim_files, map_func, reduce_func):
+    """
+    Invoke map_func on each file in sim_files and reduce results using reduce_func.
+
+    :param sim_files: list of files that contain simulations
+    :type sim_files: list
+    :param map_func:function to create summary content for object x
+    :type map_func: function
+    :param reduce_func: function to reduce summary content of objects x & y
+    :type reduce_func: function
+
+    :returns: ?
+    :rtype: ?
+
+    """
+    if len(sim_files):
+        x = map(map_func, sim_files)
+        return reduce(reduce_func, x)
+    else:
+        raise TypeError('No files')
+
+
+def invoke_map_reduce_function_map(sims, function_map):
+    """ Invokes map/reduce pattern for many items on a list of simulations.
+    Functions are specified as "item name" -> (map_func, reduce_func) pairs in function_map.
+    In each iteration, map_func is invoked on sims, and then reduce_func is invoked on result.
+    I.e. map_func takes list as single argument and reduce_func takes x and y as args.
+
+    Returns a dict with keys function_map.keys() and values the result of reduce_func
+    """
+
+    response = OrderedDict()
+    for item, function_tuple in function_map.iteritems():
+        map_func, reduce_func = function_tuple
+        x = reduce(reduce_func, map(map_func, sims))
+        response[item] = x
+
+    return response
+
+
+def partition_and_aggregate(sims, ps, function_map):
+    """ Function partitions simulations into subsets that used the same set of parameters,
+    and then invokes a collection of map/reduce function pairs on each subset.
+
+    :param sims: list of simulations (probably in JSON format)
+    :type sims: list
+    :param ps: ParameterSpace that will explain how to filter simulations
+    :type ps: ParameterSpace
+    :param function_map: map of item -> (map_func, reduce_func) pairs
+    :type function_map: dict
+
+    :returns: map of parameter combination to reduced object
+    :rtype: dict
+
+    """
+
+    var_names = ps.keys()
+    z = [(var_name, ps[var_name]) for var_name in var_names]
+    labels, val_arrays = zip(*z)
+    param_combinations = list(itertools.product(*val_arrays))
+    out = OrderedDict()
+    for param_combo in param_combinations:
+
+        these_params = dict(zip(labels, param_combo))
+        these_sims = filter_sims(sims, these_params)
+
+        out[param_combo] =  invoke_map_reduce_function_map(these_sims, function_map)
+
+    return out
+
+
+def fetch_partition_and_aggregate(f, ps, function_map, verbose=False):
+    """ Function loads JSON sims in file f and then hands off to partition_and_aggregate.
+
+    :param f: file location
+    :type f: str
+    :param ps: ParameterSpace that will explain how to filter simulations
+    :type ps: ParameterSpace
+    :param function_map: map of item -> (map_func, reduce_func) pairs
+    :type function_map: dict
+
+    :returns: map of parameter combination to reduced object
+    :rtype: dict
+
+    """
+
+    sims = _open_json_local(f)
+    if verbose:
+        print 'Fetched {} sims from {}'.format(len(sims), f)
+    return partition_and_aggregate(sims, ps, function_map)
+
+
+def reduce_maps_by_summing(x, y):
+    """ Reduces maps x and y by adding the value of every item in x to matching value in y.
+
+    :param x: first map
+    :type x: dict
+    :param y: second map
+    :type y: dict
+    :returns: map of summed values
+    :rtype: dict
+
+    """
+
+    response = OrderedDict()
+    for k in x.keys():
+        response[k] = x[k] + y[k]
+    return response
+
+
+def reduce_product_of_two_files_by_summing(x, y):
+    """ Reduce the summaries of two files by summing. """
+    response = OrderedDict()
+    for k in x.keys():
+        response[k] = reduce_maps_by_summing(x[k], y[k])
+    return response
+
+
+def multiindex_dataframe_from_tuple_map(x, labels):
+    """ Create pandas.DataFrame from map of param-tuple -> value
+
+    :param x: map of parameter-tuple -> value pairs
+    :type x: dict
+    :param labels: list of item labels
+    :type labels: list
+    :returns: DataFrame object
+    :rtype: pandas.DataFrame
+
+    """
+    import pandas as pd
+    k, v = zip(*[(k, v) for (k, v) in x.iteritems()])
+    i = pd.MultiIndex.from_tuples(k, names=labels)
+    return pd.DataFrame(list(v), index=i)

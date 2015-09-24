@@ -39,6 +39,7 @@ class DoseFindingTrial(object):
     has_more()
     observed_toxicity_rates()
     optimal_decision(prob_tox)
+    plot_outcomes(chart_title)
 
     Further internal interface is provided by:
     __reset()
@@ -99,6 +100,12 @@ class DoseFindingTrial(object):
     def number_of_doses(self):
         """ How many dose-levels are under investigation?"""
         return self.num_doses
+
+    def dose_levels(self):
+        """ Get list of dose levels, aka dose indices
+        :return: list of dose indices
+        """
+        return range(1, self.num_doses+1)
 
     def first_dose(self):
         """ Get first dose
@@ -194,6 +201,28 @@ class DoseFindingTrial(object):
         """
 
         raise NotImplementedError()
+
+    def plot_outcomes(self, chart_title=None):
+        """
+        :return:
+        """
+        if self.size() > 0:
+            from ggplot import (ggplot, ggtitle, geom_text, aes, ylim)
+            import numpy as np
+            import pandas as pd
+            patient_number = range(1, self.size()+1)
+            symbol = np.where(self.toxicities(), 'X', 'O')
+            data = pd.DataFrame({'Patient number': patient_number,
+                                 'Dose level': self.doses(),
+                                 'DLT': self.toxicities(),
+                                 'Symbol': symbol})
+            if not chart_title:
+                chart_title="Each point represents a patient\nA circle indicates no toxicity, a cross toxicity"
+                chart_title = chart_title + "\n"
+
+            p = ggplot(data, aes(x='Patient number', y='Dose level', label='Symbol')) \
+                + ggtitle(chart_title) + geom_text(aes(size=20, vjust=-0.07)) + ylim(1, 5)
+            return p
 
     @abc.abstractmethod
     def __reset(self):

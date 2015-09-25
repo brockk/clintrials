@@ -6,7 +6,7 @@ setup(
     packages = find_packages(exclude=['gh-pages', 'doc', 'tutorials']),
     # packages = ['clintrials'],  # this must be the same as the name above
 
-    version = '0.1.2',
+    version = '0.1.3',
 
     description = 'clintrials is a library of clinical trial designs and methods in Python',
 
@@ -16,7 +16,7 @@ setup(
 
     url = 'https://github.com/brockk/clintrials',  # use the URL to the github repo
 
-    download_url = 'https://github.com/brockk/clintrials/tarball/0.1.2',  # Should match a git tag
+    download_url = 'https://github.com/brockk/clintrials/tarball/0.1.3',  # Should match a git tag
 
     keywords = ['clinical', 'trial', 'biostatistics', 'medical', 'statistics'],  # keywords
 

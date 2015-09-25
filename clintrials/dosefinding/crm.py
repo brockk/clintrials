@@ -313,7 +313,7 @@ class CRM(DoseFindingTrial):
             proposed_dose = min_dose_given - 1
         # Note: other methods of limiting dose escalation and de-escalation are possible.
 
-        # Toxicity at lowest dose
+        # Excess toxicity at lowest dose?
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:
             labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
             beta_sample = norm(loc=beta_hat, scale=np.sqrt(beta_var)).rvs(1000000)  # N.b. normal sample a la prior
@@ -326,22 +326,28 @@ class CRM(DoseFindingTrial):
 
         return proposed_dose
 
-    def prob_tox(self, n=10**6):
-        if self.estimate_var:
-            # Estimate probability of toxicity using plug-in mean and variance for beta, and randomly
-            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
-            # TODO: research replacing this with a proper posterior integral when in bayes mode.
-            labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
-            beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
-            p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
-            return np.array([np.mean(x) for x in p0_sample])
-        else:
-            raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
+    # def prob_tox(self, n=10**6):
+    #     if self.estimate_var:
+    #         # Estimate probability of toxicity using plug-in mean and variance for beta, and randomly
+    #         # sampling values from normal. Why normal? Because the prior for is normal and the posterior
+    #         # is asymptotically normal. For low n, non-normality may lead to bias.
+    #         # TODO: research replacing this with a proper posterior integral when in bayes mode.
+    #         labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+    #         beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
+    #         p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
+    #         return np.array([np.mean(x) for x in p0_sample])
+    #     else:
+    #         raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
+
+    def prob_tox(self):
+        labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+        return [self.F_func(x, a0=self.first_dose(), beta=self.beta_hat) for x in labels]
 
     def prob_tox_exceeds(self, tox_cutoff, n=10**6):
         if self.estimate_var:
             # Estimate probability of toxicity exceeds tox_cutoff using plug-in mean and variance for beta, and randomly
-            # sampling values from normal. Why normal? Because the prior for beta is normal. This is mucky.
+            # sampling values from normal. Why normal? Because the prior for is normal and the posterior
+            # is asymptotically normal. For low n, non-normality may lead to bias.
             # TODO: research replacing this with a proper posterior integral when in bayes mode.
             labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
             beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
@@ -375,3 +381,80 @@ class CRM(DoseFindingTrial):
 
         return np.argmin(np.abs(prob_tox - self.target)) + 1
 
+    def get_tox_prob_quantile(self, p):
+        """ Get the quantiles of the probabilities of toxicity at each dose using normal approximation.
+        :param p: probability, i.e. 0.05 means 5th quantile, i.e. 95% of values are greater
+        :type p: float
+        :return: the quantiles of the probabilities of toxicity at each dose
+        :rtype: list
+        """
+        norm_crit = norm.ppf(p)
+        beta_est = self.beta_hat - norm_crit*np.sqrt(self.beta_var)
+        labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
+        p = [self.F_func(x, a0=self.first_dose(), beta=beta_est) for x in labels]
+        return p
+
+    def plot_toxicity_probabilities(self, chart_title=None, use_ggplot=False):
+        """ Plot prior and posterior dose-toxicity curves.
+
+        :param chart_title: optional chart title. Default is fairly verbose
+        :type chart_title: str
+        :param use_ggplot: True to use ggplot, else matplotlib
+        :type use_ggplot: bool
+        :return: plot of toxicity curves
+
+        """
+
+        if not chart_title:
+            chart_title="Prior (dashed) and posterior (solid) dose-toxicity curves"
+            chart_title = chart_title + "\n"
+
+        if use_ggplot:
+            from ggplot import (ggplot, ggtitle, geom_line, geom_hline, aes, ylim)
+            import numpy as np
+            import pandas as pd
+            data = pd.DataFrame({'Dose level': self.dose_levels(),
+                         'Prior': self.prior,
+                         'Posterior': self.prob_tox(),
+    #                      'Lower': crm.get_tox_prob_quantile(0.05),
+    #                      'Upper': crm.get_tox_prob_quantile(0.95)
+                        })
+            var_name = 'Type'
+            value_name = 'Probability of toxicity'
+            melted_data = pd.melt(data, id_vars='Dose level', var_name=var_name, value_name=value_name)
+            #melted_data['LineType'] =  np.where(melted_data.Type=='Posterior', '--', np.where(melted_data.Type=='Prior', '-', '..'))
+            # melted_data['LineType'] =  np.where(melted_data.Type=='Posterior', '--', np.where(melted_data.Type=='Prior', '-', '..'))
+            # melted_data['Col'] =  np.where(melted_data.Type=='Posterior', 'green', np.where(melted_data.Type=='Prior', 'blue', 'yellow'))
+            # np.where(melted_data.Type=='Posterior', '--', '-')
+
+            p = ggplot(melted_data, aes(x='Dose level', y=value_name, linetype=var_name)) + geom_line() \
+                + ggtitle(chart_title) + ylim(0, 1) + geom_hline(yintercept=self.target, color='black')
+            # Can add confidence intervals once I work out linetype=??? in ggplot
+
+            return p
+        else:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            dl = self.dose_levels()
+            prior_tox = self.prior
+            post_tox = self.prob_tox()
+            post_tox_lower = self.get_tox_prob_quantile(0.05)
+            post_tox_upper = self.get_tox_prob_quantile(0.95)
+            plt.plot(dl, prior_tox, '--', c='black')
+            plt.plot(dl, post_tox, '-', c='black')
+            plt.plot(dl, post_tox_lower, '-.', c='black')
+            plt.plot(dl, post_tox_upper, '-.', c='black')
+            plt.scatter(dl, prior_tox, marker='x', s=300, facecolors='none', edgecolors='k')
+            plt.scatter(dl, post_tox, marker='o', s=300, facecolors='none', edgecolors='k')
+            plt.axhline(self.target)
+            plt.ylim(0,1)
+            plt.xlim(np.min(dl), np.max(dl))
+            plt.xticks(dl)
+            plt.ylabel('Probability of toxicity')
+            plt.xlabel('Dose level')
+            plt.title(chart_title)
+
+            p = plt.gcf()
+            phi = (np.sqrt(5)+1)/2.
+            p.set_size_inches(12, 12/phi)
+            # return p

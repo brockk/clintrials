@@ -39,6 +39,7 @@ class DoseFindingTrial(object):
     has_more()
     observed_toxicity_rates()
     optimal_decision(prob_tox)
+    plot_outcomes(chart_title)
 
     Further internal interface is provided by:
     __reset()
@@ -99,6 +100,12 @@ class DoseFindingTrial(object):
     def number_of_doses(self):
         """ How many dose-levels are under investigation?"""
         return self.num_doses
+
+    def dose_levels(self):
+        """ Get list of dose levels, aka dose indices
+        :return: list of dose indices
+        """
+        return range(1, self.num_doses+1)
 
     def first_dose(self):
         """ Get first dose
@@ -194,6 +201,59 @@ class DoseFindingTrial(object):
         """
 
         raise NotImplementedError()
+
+    def plot_outcomes(self, chart_title=None, use_ggplot=False):
+        """ Plot the outcomes of patients observed.
+
+        :param chart_title: optional chart title. Default is fairly verbose
+        :type chart_title: str
+        :param use_ggplot: True to use ggplot, else matplotlib
+        :type use_ggplot: bool
+        :return: a plot of patient outcomes
+
+        """
+
+        if not chart_title:
+            chart_title="Each point represents a patient\nA circle indicates no toxicity, a cross toxicity"
+            chart_title = chart_title + "\n"
+
+        if use_ggplot:
+            if self.size() > 0:
+                from ggplot import (ggplot, ggtitle, geom_text, aes, ylim)
+                import numpy as np
+                import pandas as pd
+                patient_number = range(1, self.size()+1)
+                symbol = np.where(self.toxicities(), 'X', 'O')
+                data = pd.DataFrame({'Patient number': patient_number,
+                                     'Dose level': self.doses(),
+                                     'DLT': self.toxicities(),
+                                     'Symbol': symbol})
+
+                p = ggplot(data, aes(x='Patient number', y='Dose level', label='Symbol')) \
+                    + ggtitle(chart_title) + geom_text(aes(size=20, vjust=-0.07)) + ylim(1, 5)
+                return p
+        else:
+            if self.size() > 0:
+                import matplotlib.pyplot as plt
+                import numpy as np
+                patient_number = np.arange(1, self.size()+1)
+                doses_given = np.array(self.doses())
+                tox_loc = np.array(self.toxicities()).astype('bool')
+                if sum(tox_loc):
+                    plt.scatter(patient_number[tox_loc], doses_given[tox_loc], marker='x', s=300,
+                                facecolors='none', edgecolors='k')
+                if sum(~tox_loc):
+                    plt.scatter(patient_number[~tox_loc], doses_given[~tox_loc], marker='o', s=300,
+                                facecolors='none', edgecolors='k')
+
+                plt.title(chart_title)
+                plt.ylabel('Dose level')
+                plt.xlabel('Patient number')
+                plt.yticks(self.dose_levels())
+                p = plt.gcf()
+                phi = (np.sqrt(5)+1)/2.
+                p.set_size_inches(12, 12/phi)
+                # return p
 
     @abc.abstractmethod
     def __reset(self):

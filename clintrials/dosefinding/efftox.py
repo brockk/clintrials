@@ -738,6 +738,108 @@ def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff
     return conform, util, np.nan, -1, np.nan
 
 
+def get_obd(tox_curve, eff_curve, metric, tox_cutoff, eff_cutoff):
+    X = solve_metrizable_efftox_scenario(tox_curve, eff_curve, metric,
+                                         tox_cutoff, eff_cutoff)
+    conform, util, u_star, obd, u_cushion = X
+    return obd
+
+
+def get_conformative_doses(tox_curve, eff_curve, metric, tox_cutoff, eff_cutoff):
+    X = solve_metrizable_efftox_scenario(tox_curve, eff_curve, metric,
+                                         tox_cutoff, eff_cutoff)
+    conform, util, u_star, obd, u_cushion = X
+    return [int(x) for x in conform]
+
+
+def get_util(tox_curve, eff_curve, metric, tox_cutoff, eff_cutoff):
+    X = solve_metrizable_efftox_scenario(tox_curve, eff_curve, metric,
+                                         tox_cutoff, eff_cutoff)
+    conform, util, u_star, obd, u_cushion = X
+    return np.round(util, 2)
+
+
+def classify_problem(delta, prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff, text_label=True):
+    X = solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff)
+    conform, util, u_star, obd, u_cushion = X
+    dose_within_delta = np.array([u >= (1-delta)*u_star for u in util])
+    if obd == -1:
+        if text_label:
+            return 'Stop'
+        else:
+            return 1
+    elif sum(dose_within_delta) == 1:
+        if text_label:
+            return 'Optimal'
+        else:
+            return 2
+    else:
+        if text_label:
+            return 'Desirable'
+        else:
+            return 3
+
+
+def get_problem_class(delta, tox_curve, eff_curve, metric, tox_cutoff, eff_cutoff):
+    return classify_problem(delta, tox_curve, eff_curve, metric, tox_cutoff, eff_cutoff)
+
+
+def classify_tox_class(prob_tox, tox_cutoff, text_label=True):
+    prob_tox = np.array(prob_tox)
+    if sum(prob_tox < tox_cutoff) == len(prob_tox):
+        if text_label:
+            return 'Tolerable'
+        else:
+            return 1
+    elif sum(prob_tox > tox_cutoff) == len(prob_tox):
+        if text_label:
+            return 'Toxic'
+        else:
+            return 2
+    else:
+        if text_label:
+            return 'Mixed'
+        else:
+            return 3
+
+
+def get_tox_class(tox_curve, tox_cutoff):
+    prob_tox = tox_curve
+    return classify_tox_class(prob_tox, tox_cutoff)
+
+
+def classify_eff_class(prob_eff, eff_cutoff, text_label=True):
+    prob_eff = np.array(prob_eff)
+    max_eff = np.max(prob_eff)
+    if np.all([prob_eff[i] > prob_eff[i-1] for i in range(1, len(prob_eff))]):
+        if text_label:
+            return 'Monotonic'
+        else:
+            return 1
+    elif sum(prob_eff == max_eff) == 1:
+        if text_label:
+            return 'Unimodal'
+        else:
+            return 2
+    elif sum(prob_eff == max_eff) > 1:
+        if text_label:
+            return 'Plateau'
+        else:
+            return 3
+    else:
+        if text_label:
+            return 'Weird'
+        else:
+            return 4
+
+
+def get_eff_class(eff_curve, eff_cutoff):
+    prob_eff = eff_curve
+    return classify_eff_class(prob_eff, eff_cutoff)
+
+
+
+
 def efftox_dose_transition_pathways(trial, cohort_number, cohort_size,
                                     cases_already_observed, next_dose=None, to_pandas_dataframe=True,
                                     verbose=False, use_labels=False, log_every=10, utility_gap_threshold=0.05,

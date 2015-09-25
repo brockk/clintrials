@@ -1,4 +1,4 @@
 __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
-__all__ = ["dosefinding", "coll", "common", "phase2", "recruitment", "tte", "util"]
+__all__ = ["dosefinding", "phase2", "coll", "common", "recruitment", "simulation", "stats", "tte", "util"]

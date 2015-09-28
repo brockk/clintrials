@@ -263,6 +263,8 @@ class LpNormCurve:
         self.minimum_tolerable_efficacy = minimum_tolerable_efficacy
         self.maximum_tolerable_toxicity = maximum_tolerable_toxicity
         self.p = brentq(_find_p, 0, 100)
+        self.hinge_points = [(minimum_tolerable_efficacy, 0), (1, maximum_tolerable_toxicity),
+                             (hinge_prob_eff, hinge_prob_tox)]
 
     def __call__(self, prob_eff, prob_tox):
         x = prob_eff
@@ -298,6 +300,82 @@ class LpNormCurve:
             a = ((1 - x) / (1 - x_l))
             b = (scaled_delta - a**self.p)**(1/self.p)
             return b*y_l
+
+    def get_tox(self, eff, util=0.0):
+        """ Get equivalent toxicity probability for given efficacy probability and utility value.
+        :param eff: efficacy probability
+        :type eff: float
+        :param util: utility value, defaults to zerp for neutral utility
+        :type util: float
+        :return: toxicity probability
+        :rtype: float
+
+        """
+
+        p = self.p
+        eff0 = self.minimum_tolerable_efficacy
+        tox1 = self.maximum_tolerable_toxicity
+        a = ((1-eff) / (1-eff0))
+        return tox1 * ((1-util)**p -a**p)**(1/p)
+
+    def plot_contours(self, use_ggplot=False, prior_eff_probs=None, prior_tox_probs=None, n=1000,
+                      util_lower=-0.8, util_upper=0.8, util_delta=0.2, title='EffTox utility contours'):
+        """
+        :param use_ggplot: True to use ggplot, False to use matplotlib
+        :type use_ggplot: bool
+        :param prior_eff_probs: optional
+        :type prior_eff_probs: list
+        :param prior_tox_probs:
+        :type prior_tox_probs: list
+        :param n: number of points per line
+        :type n: int
+        :param util_lower: lowest utility value to plot contour for
+        :type util_lower: float
+        :param util_upper: lowest utility value to plot contour for
+        :type util_upper: float
+        :param util_delta: plot contours for each increment in utility
+        :type util_delta: float
+
+        :return: plot of efficacy-toxicity contours
+
+        """
+
+        eff_vals = np.linspace(0, 1, n)
+        util_vals = np.linspace(util_lower, util_upper, ((util_upper-util_lower) / util_delta) + 1)
+
+        if use_ggplot:
+            raise NotImplementedError()
+        else:
+            import matplotlib.pyplot as plt
+            # Plot general contours
+            for u in util_vals:
+                tox_vals = [self.get_tox(eff=x, util=u) for x in eff_vals]
+                plt.plot(eff_vals, tox_vals, '-', c='k', lw=0.5)
+
+            # Add neutral utility contour
+            tox_vals = [self.get_tox(eff=x, util=0) for x in eff_vals]
+            plt.plot(eff_vals, tox_vals, '-', c='k', lw=2, label='neutral utility')
+
+            # Add hinge points
+            hinge_prob_eff, hinge_prob_tox = zip(*self.hinge_points)
+            plt.plot(hinge_prob_eff, hinge_prob_tox, 'ro', ms=10, label='hinge points')
+
+            # Add priors
+            if prior_eff_probs is not None and prior_tox_probs is not None:
+                plt.plot(prior_eff_probs, prior_tox_probs, 'b^', ms=10, label='priors')
+
+            # Plot size
+            plt.ylim(0, 1)
+            plt.xlim(0, 1)
+            plt.xlabel('Prob(Efficacy)')
+            plt.ylabel('Prob(Toxicity)')
+            plt.title(title)
+            plt.legend()
+
+            # Return
+            p = plt.gcf()
+            phi = (np.sqrt(5)+1)/2.
+            p.set_size_inches(12, 12/phi)
 
 
 class InverseQuadraticCurve:
@@ -352,6 +430,30 @@ class InverseQuadraticCurve:
     def solve(self, prob_eff=None, prob_tox=None, delta=0):
         """ Specify exactly one of prob_eff or prob_tox and this will return the other, for given delta"""
         # TODO
+        raise NotImplementedError()
+
+    def plot_contours(self, use_ggplot=False, prior_eff_probs=None, prior_tox_probs=None, n=1000,
+                      util_lower=-0.8, util_upper=0.8, util_delta=0.2, title='EffTox utility contours'):
+        """
+        :param use_ggplot: True to use ggplot, False to use matplotlib
+        :type use_ggplot: bool
+        :param prior_eff_probs: optional
+        :type prior_eff_probs: list
+        :param prior_tox_probs:
+        :type prior_tox_probs: list
+        :param n: number of points per line
+        :type n: int
+        :param util_lower: lowest utility value to plot contour for
+        :type util_lower: float
+        :param util_upper: lowest utility value to plot contour for
+        :type util_upper: float
+        :param util_delta: plot contours for each increment in utility
+        :type util_delta: float
+
+        :return: plot of efficacy-toxicity contours
+
+        """
+
         raise NotImplementedError()
 
 # I used to call the InverseQuadraticCurve an ABC_Curve because it uses three parameters, a, b and c.

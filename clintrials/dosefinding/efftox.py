@@ -548,6 +548,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         if len(theta_priors) != 6:
             raise ValueError('theta_priors should have 6 items.')
 
+        self.real_doses = real_doses
         self._scaled_doses = np.log(real_doses) - np.mean(np.log(real_doses))
         self.priors = theta_priors
         self.tox_cutoff = tox_cutoff
@@ -774,6 +775,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         return self._post_density_plot(func=get_utility, x_name='Utility', plot_title='Posterior densities of Utility',
                                        include_doses=include_doses, boot_samps=boot_samps)
+
+
 
 
 def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):

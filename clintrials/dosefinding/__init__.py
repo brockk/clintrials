@@ -854,6 +854,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     status()
     reset()
     number_of_doses()
+    dose_levels()
     first_dose()
     size()
     max_size()
@@ -928,6 +929,12 @@ class EfficacyToxicityDoseFindingTrial(object):
     def number_of_doses(self):
         """ How many dose-levels are under investigation?"""
         return self.num_doses
+
+    def dose_levels(self):
+        """ Get list of dose levels, aka dose indices
+        :return: list of dose indices
+        """
+        return range(1, self.num_doses+1)
 
     def first_dose(self):
         """
@@ -1013,6 +1020,9 @@ class EfficacyToxicityDoseFindingTrial(object):
     def admissable_set(self):
         """ Get the admissable set of doses. """
         return self._admissable_set
+
+    def dose_admissability(self):
+        return np.array([(x in self._admissable_set) for x in self.dose_levels()])
 
     def observed_toxicity_rates(self):
         """ Get the observed rate of toxicity at all doses. """

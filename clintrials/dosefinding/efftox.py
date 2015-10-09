@@ -318,15 +318,16 @@ class LpNormCurve:
         a = ((1-eff) / (1-eff0))
         return tox1 * ((1-util)**p -a**p)**(1/p)
 
-    def plot_contours(self, use_ggplot=False, prior_eff_probs=None, prior_tox_probs=None, n=1000,
-                      util_lower=-0.8, util_upper=0.8, util_delta=0.2, title='EffTox utility contours'):
+    def plot_contours(self, use_ggplot=False, prob_eff=None, prob_tox=None, n=1000,
+                      util_lower=-0.8, util_upper=0.8, util_delta=0.2, title='EffTox utility contours',
+                      custom_points_label = 'priors'):
         """
         :param use_ggplot: True to use ggplot, False to use matplotlib
         :type use_ggplot: bool
-        :param prior_eff_probs: optional
-        :type prior_eff_probs: list
-        :param prior_tox_probs:
-        :type prior_tox_probs: list
+        :param prob_eff: optional
+        :type prob_eff: list
+        :param prob_tox:
+        :type prob_tox: list
         :param n: number of points per line
         :type n: int
         :param util_lower: lowest utility value to plot contour for
@@ -335,6 +336,10 @@ class LpNormCurve:
         :type util_upper: float
         :param util_delta: plot contours for each increment in utility
         :type util_delta: float
+        :param title: chart title
+        :type title: str
+        :param custom_points_label: label for points provided via prob_eff and prob_tox
+        :type custom_points_label: str
 
         :return: plot of efficacy-toxicity contours
 
@@ -360,9 +365,9 @@ class LpNormCurve:
             hinge_prob_eff, hinge_prob_tox = zip(*self.hinge_points)
             plt.plot(hinge_prob_eff, hinge_prob_tox, 'ro', ms=10, label='hinge points')
 
-            # Add priors
-            if prior_eff_probs is not None and prior_tox_probs is not None:
-                plt.plot(prior_eff_probs, prior_tox_probs, 'b^', ms=10, label='priors')
+            # Add custom points
+            if prob_eff is not None and prob_tox is not None:
+                plt.plot(prob_eff, prob_tox, 'b^', ms=10, label=custom_points_label)
 
             # Plot size
             plt.ylim(0, 1)

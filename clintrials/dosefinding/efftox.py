@@ -703,9 +703,6 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
             dose_index = i+1
             if dose_index in include_doses:
                 x = func(x, samp)
-                # tox_probs = _pi_T(x, mu=samp[:, 0], beta=samp[:, 1])
-                # eff_probs = _pi_E(x, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
-                # u = self.metric(eff_probs, tox_probs)
                 x_boot.extend(np.random.choice(x, size=boot_samps, replace=True, p=p))
                 dose_indices.extend(np.repeat(dose_index, boot_samps))
         df = pd.DataFrame({x_name: x_boot, 'Dose': dose_indices})
@@ -780,6 +777,48 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         return self._post_density_plot(func=get_utility, x_name='Utility', plot_title='Posterior densities of Utility',
                                        include_doses=include_doses, boot_samps=boot_samps)
+
+
+    def prob_superior_utility(self, dl1, dl2):
+        """ Returns the probability that the utility of dose-level 1 (dl1) exceeds that of dose-level 2 (dl2)
+
+        :param dl1: 1-based dose-level of dose 1
+        :type dl1: int
+        :param dl2: 1-based dose-level of dose 2
+        :type dl2: int
+        :return: probability that utility of dose-level 1 exceeds that of dose-level 2
+        :rtype: float
+
+        """
+
+        if dl1 == dl2:
+            return 0
+
+        samp = self.pds._samp
+        p = self.pds._probs
+        p /= p.sum()
+
+        x1 = self.scaled_doses()[dl1-1]
+        x1_tox_probs = _pi_T(x1, mu=samp[:, 0], beta=samp[:, 1])
+        x1_eff_probs = _pi_E(x1, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+        u1 = self.metric(x1_eff_probs, x1_tox_probs)
+
+        x2 = self.scaled_doses()[dl2-1]
+        x2_tox_probs = _pi_T(x2, mu=samp[:, 0], beta=samp[:, 1])
+        x2_eff_probs = _pi_E(x2, mu=samp[:, 2], beta1=samp[:, 3], beta2=samp[:, 4])
+        u2 = self.metric(x2_eff_probs, x2_tox_probs)
+
+        return np.sum(p * (u1 > u2))
+
+    def utility_superiority_matrix(self):
+        superiority_mat = np.zeros((4, 4))
+        superiority_mat[:] = np.nan
+        for i in range(1, self.num_doses+1):
+            for j in range(i+1, self.num_doses+1):
+                p = self.prob_superior_utility(i, j)
+                superiority_mat[i-1, j-1] = p
+                superiority_mat[j-1, i-1] = 1-p
+        return superiority_mat
 
 
 

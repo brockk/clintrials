@@ -10,7 +10,7 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 
 """
 
-from datetime import datetime
+from collections import OrderedDict
 import logging
 from itertools import product, combinations_with_replacement
 
@@ -20,6 +20,7 @@ from scipy.optimize import brentq
 from clintrials.common import inverse_logit
 from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
 from clintrials.stats import ProbabilityDensitySample
+from clintrials.util import atomic_to_json, iterable_to_json
 
 
 def scale_doses(real_doses):
@@ -987,176 +988,114 @@ def get_eff_class(eff_curve, eff_cutoff):
     return classify_eff_class(prob_eff, eff_cutoff)
 
 
+def _patient_outcome_to_label(po):
+    """ Converts (0,0) to Neither; (1,0) to Toxicity, (0,1) to Efficacy, (1,1) to Both """
+    if po == (0,0):
+        return 'Neither'
+    elif po == (1,0):
+        return 'Toxicity'
+    elif po == (0,1):
+        return 'Efficacy'
+    elif po == (1,1):
+        return 'Both'
+    else:
+        return 'Error'
 
 
-def efftox_dose_transition_pathways(trial, cohort_number, cohort_size,
-                                    cases_already_observed, next_dose=None, to_pandas_dataframe=True,
-                                    verbose=False, use_labels=False, log_every=10, utility_gap_threshold=0.05,
-                                    num_replicates=100, replicate_accuracy=10**6, **kwargs):
-    """ Calculate dose-transition pathways for an EffTox design.
+def efftox_dose_transition_pathways(trial, next_dose, cohort_sizes, cohort_number=1, cases_already_observed=[],
+                                custom_output_func=None, verbose=False, **kwargs):
+    """ Calculate dose-transition pathways for an efficacy-toxicity design.
 
-    :param trial: instance of EffTox that will determine the dose path
-    :type trial: clintrials.dosefinding.efftox.EffTox
-    :param cohort_number: int, calculate DTPs for this cohort
+    :param trial: subclass of EfficacyToxicityDoseFindingTrial that will determine the dose path
+    :type trial: clintrials.dosefinding.EfficacyToxicityDoseFindingTrial
+    :param next_dose: the dose that will be given to patients in the very next cohort to get things going.
+    :type next_dose: int
+    :param cohort_sizes: list of ints, sizes of future cohorts that we want to calculate DTPs for.
+                            E.g. use [3,2] to calculate DTPs for two subsequent cohorts, the first of
+                            three patients followed by another cohort of two.
+    :type cohort_size: list
+    :param cohort_number: The decorative cohort number label for the first cohort
     :type cohort_number: int
-    :param cohort_size: number of patients per cohort
-    :type cohort_size: int
     :param cases_already_observed: list of (dose, tox=0/1, eff=0/1) cases that have already been observed
     :type cases_already_observed: list
-    :param next_dose: the dose that will be given to the first cohort.
-                      If None and cases_already_observed is non-empty, next_dose is calculated by the trial instance,
-                          after being updated with the observed cases.
-                      If None and cases_already_observed is empty, the trial's first dose is used.
-    :type next_dose: int
-    :param to_pandas_dataframe: True to get a pandas DataFrame returned with meaningful col headers.
-                                False to get a list of lists.
-    :type to_pandas_dataframe: bool
+    :param custom_output_func: func that takes trial as sole argument and returns dict of extra output.
+                                Called at end of each cohort, i.e. at each dose decision.
+    :type custom_output_func: func
     :param verbose: True to print extra information to monitor progress
     :type verbose: bool
-    :param use_labels: True to use labels like 'Both', 'Toxicity', etc in place of (1,1) and (1,0)
-    :type use_labels: bool
-    :param log_every: if verbose, log a progress message after every nth iteration
-    :type log_every: int
-    :param utility_gap_threshold: If the gap between first and second utilities is less than this
-                                    (i.e. the utility maximisation case is tight) then DO WHAT??!
-    :type utility_gap_threshold: float
-    :param num_replicates: number of replicates to use when calculating distribution of next dose decision
-    :type num_replicates: int
-    :param replicate_accuracy: number of points to use per integral when updating EffTox; really affects run-time.
-    :type replicate_accuracy: int
     :param kwargs: extra keyword args to send to trial.update method
     :type kwargs: dict
 
-    :return: pandas DataFrame if to_pandas_dataframe else list of lists
-    :rtype: pandas.DataFrame
-
-    .. note:: No DTPs for multiple cohorts!
-       Calculating dose transition pathways for multiple cohorts at once is suppressed for
-       EffTox because of the oscillating dose problem.
-       Run DTPs for a single cohort at a time, and check if the posterior utilities are close together.
+    :return: DTPs as JSON-able dict object. Paths are nested.
+    :rtype: dict
 
     """
 
-    def _patient_outcome_to_label(po):
-        """ Converts (0,0) to Neither; (1,0) to Toxicity, etc"""
-        if po == (0,0):
-            return 'Neither'
-        elif po == (1,0):
-            return 'Toxicity'
-        elif po == (0,1):
-            return 'Efficacy'
-        elif po == (1,1):
-            return 'Both'
-        else:
-            return 'Error'
-
-    def _path_and_dose_recommendations_to_row(path, doses):
-        if len(doses) > 0:
-            row = [doses[0]]
-            for coh, dose in zip(path, doses[1:]):
-                for p in coh:
-                    if use_labels:
-                        row.append(_patient_outcome_to_label(p))
-                    else:
-                        row.append(p[0])
-                        row.append(p[1])
-                row.append(dose)
-        else:
-            row = []
-        return row
-
-    def _get_col_names(first_cohort_number, last_cohort_number, cohort_size):
-        cohort_ids = range(first_cohort_number, last_cohort_number+1)
-        cols = ['Dose{}'.format(first_cohort_number-1)]
-        for i in cohort_ids:
-            for j in range(1, cohort_size+1):
-                if use_labels:
-                    cols.append('Pat{}.{}'.format(i, j))
-                else:
-                    cols.append('Tox{}.{}'.format(i, j))
-                    cols.append('Eff{}.{}'.format(i, j))
-            cols.append('Dose{}'.format(i))
-        return cols
-
-
-    patient_outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
-    cohort_outcomes = list(combinations_with_replacement(patient_outcomes, cohort_size))
-    dose_indices = range(1, trial.num_doses+1)
-
-    def _run_replicate(trial, cases, **kwargs):
-        trial.reset()
-        return trial.update(cases, **kwargs)
-
-    out = []
-    for i, path in enumerate(cohort_outcomes):
-
-        trial.reset()
-        if cases_already_observed:
-            trial.update(cases_already_observed, **kwargs)
-
-        if next_dose is not None:
-            dose = next_dose
-        elif len(cases_already_observed) > 0:
-            dose = trial.next_dose()
-        else:
-            dose = trial.first_dose()
-        doses = [dose]
-
-        cases = [(dose, x[0], x[1]) for x in path]
-        dose = trial.update(cases, **kwargs)
-        doses.append(dose)
-        # Event counts
-        num_eff = sum([x[1] for x in path])
-        num_tox = sum([x[0] for x in path])
-
-        # Utility
-        u = trial.utility
-        u1, u2 = sorted(u, reverse=1)[:2]
-        u_cushion = u1 - u2
-        if u_cushion < utility_gap_threshold:
-            utility_class = 'Close'
-        else:
-            utility_class = 'Distinct'
-
-
-        # Distribution of dose-recommendations
-        all_cases = cases_already_observed + cases
-        obd_samples = np.array([_run_replicate(trial, all_cases, n=replicate_accuracy) for j in range(num_replicates)])
-        obd_dist = [np.mean(obd_samples == k) for k in [-1] + dose_indices]
-
-
-        row = _path_and_dose_recommendations_to_row([path], doses)
-        row.append(num_eff)
-        row.append(num_tox)
-        row.extend(obd_dist)
-        row.extend(trial.prob_eff)
-        row.extend(trial.prob_tox)
-        row.extend(trial.prob_acc_eff)
-        row.extend(trial.prob_acc_tox)
-        row.extend(trial.utility)
-        row.append(u_cushion)
-        row.append(utility_class)
-        out.append(row)
-
-        if verbose and i > 0 and i % log_every == 0:
-            print datetime.now(), '- completed {} iterations'.format(i)
-
-    if to_pandas_dataframe:
-        import pandas as pd
-        out_pd = pd.DataFrame(out)
-        cols = _get_col_names(cohort_number, cohort_number, cohort_size)
-        cols.append('NumEff')
-        cols.append('NumTox')
-        cols.append('ProbStop')
-        cols.extend(['ProbSelect({})'.format(i) for i in dose_indices])
-        cols.extend(['ProbEff({})'.format(i) for i in dose_indices])
-        cols.extend(['ProbTox({})'.format(i) for i in dose_indices])
-        cols.extend(['ProbAccEff({})'.format(i) for i in dose_indices])
-        cols.extend(['ProbAccTox({})'.format(i) for i in dose_indices])
-        cols.extend(['Util({})'.format(i) for i in dose_indices])
-        cols.append('UtilityCushion')
-        cols.append('UtilityClass')
-        out_pd.columns = cols
-        return out_pd
+    if len(cohort_sizes) <= 0:
+        return None
     else:
-        return out
+        cohort_size = cohort_sizes[0]
+        patient_outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        cohort_outcomes = list(combinations_with_replacement(patient_outcomes, cohort_size))
+        path_outputs = []
+        for i, path in enumerate(cohort_outcomes):
+            # Invoke dose-decision
+            cohort_cases = [(next_dose, x[0], x[1]) for x in path]
+            cases = cases_already_observed + cohort_cases
+            if verbose:
+                print 'Running', cases
+            trial.reset()
+            obd = trial.update(cases, **kwargs)
+            # Collect output
+            bag_o_tricks = OrderedDict([('Pat{}.{}'.format(cohort_number, j+1), _patient_outcome_to_label(po))
+                                        for (j, po) in enumerate(path)])
+            bag_o_tricks.update(OrderedDict([
+                        ('DoseGiven', atomic_to_json(next_dose)),
+                        ('RecommendedDose', atomic_to_json(obd)),
+                        ('CohortSize', cohort_size),
+                        ('NumEff', sum([x[1] for x in path])),
+                        ('NumTox', sum([x[0] for x in path])),
+                    ]))
+            if custom_output_func:
+                bag_o_tricks.update(custom_output_func(trial))
+
+            # Recurse subsequent cohorts
+            further_paths = efftox_dose_transition_pathways(trial, next_dose=obd, cohort_sizes=cohort_sizes[1:],
+                                                            cohort_number=cohort_number+1, cases_already_observed=cases,
+                                                            custom_output_func=custom_output_func, verbose=verbose,
+                                                            **kwargs)
+            if further_paths:
+                bag_o_tricks['Next'] = further_paths
+
+            path_outputs.append(bag_o_tricks)
+
+        return path_outputs
+
+
+def efftox_dtp_detail(trial):
+    to_return = OrderedDict()
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['Utility{}'.format(dl)] = trial.utility[i]
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['ProbEff{}'.format(dl)] = trial.prob_eff[i]
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['ProbAccEff{}'.format(dl)] = trial.prob_acc_eff[i]
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['ProbTox{}'.format(dl)] = trial.prob_tox[i]
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['ProbAccTox{}'.format(dl)] = trial.prob_acc_tox[i]
+
+    # What is the probability that the utility of the top dose exceeds that of the next best dose?
+    # I.e. how confident are we that OBD really is the shizzle?
+    # u1_dose_index, u2_dose_index = np.argsort(-trial.utility)[:2]
+    sup_mat = trial.utility_superiority_matrix()
+    to_return['SuperiorityMatrix'] = [iterable_to_json(x) for x in sup_mat]
+
+    obd = trial.next_dose()
+    if obd > 0:
+        min_sup = np.nanmin(sup_mat[obd-1])
+    else:
+        min_sup = np.nan
+    to_return['MinProbSuperiority'] = atomic_to_json(min_sup)
+
+    return to_return

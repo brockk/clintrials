@@ -33,6 +33,7 @@ class DoseFindingTrial(object):
     toxicities_at_dose(dose)
     maximum_dose_given()
     minimum_dose_given()
+    tabulate()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -146,6 +147,16 @@ class DoseFindingTrial(object):
             return min(self._doses)
         else:
             return None
+
+    def tabulate(self):
+        import pandas as pd
+        tab_data = OrderedDict()
+        treated_at_dose = [self.treated_at_dose(d) for d in self.dose_levels()]
+        tox_at_dose = [self.toxicities_at_dose(d) for d in self.dose_levels()]
+        tab_data['Dose'] = self.dose_levels()
+        tab_data['N'] = treated_at_dose
+        tab_data['Toxicities'] = tox_at_dose
+        return pd.DataFrame(tab_data)
 
     def set_next_dose(self, dose):
         """ Set the next dose that should be given. """
@@ -1087,9 +1098,9 @@ class EfficacyToxicityDoseFindingTrial(object):
         return -1  # Default implementation
 
 
-def dose_transition_pathways(trial, first_cohort_number, last_cohort_number, cohort_size,
-                             cases_already_observed=None, next_dose=None,
-                             to_pandas_dataframe=True, **kwargs):
+def dose_transition_pathways_to_pandas(trial, first_cohort_number, last_cohort_number, cohort_size,
+                                       cases_already_observed=None, next_dose=None, to_pandas_dataframe=True,
+                                       **kwargs):
     """ Calculate the dose-transition pathways of a DoseFindingTrial.
 
     :param trial: a dose-finding trial design, an instance of some subclass of DoseFindingTrial
@@ -1169,6 +1180,81 @@ def dose_transition_pathways(trial, first_cohort_number, last_cohort_number, coh
         return out_pd
     else:
         return out
+
+
+def dose_transition_pathways_to_json(trial, next_dose, cohort_sizes, cohort_number=1, cases_already_observed=[],
+                                     custom_output_func=None, verbose=False, **kwargs):
+    """ Calculate the dose-transition pathways of a DoseFindingTrial.
+
+    :param trial: subclass of DoseFindingTrial that will determine the dose path
+    :type trial: clintrials.dosefinding.DoseFindingTrial
+    :param next_dose: the dose that will be given to patients in the very next cohort to get things going.
+    :type next_dose: int
+    :param cohort_sizes: list of ints, sizes of future cohorts that we want to calculate DTPs for.
+                            E.g. use [3,2] to calculate DTPs for two subsequent cohorts, the first of
+                            three patients followed by another cohort of two.
+    :type cohort_size: list
+    :param cohort_number: The decorative cohort number label for the first cohort
+    :type cohort_number: int
+    :param cases_already_observed: list of (dose, tox=0/1, eff=0/1) cases that have already been observed
+    :type cases_already_observed: list
+    :param custom_output_func: func that takes trial as sole argument and returns dict of extra output.
+                                Called at end of each cohort, i.e. at each dose decision.
+    :type custom_output_func: func
+    :param verbose: True to print extra information to monitor progress
+    :type verbose: bool
+    :param kwargs: extra keyword args to send to trial.update method
+    :type kwargs: dict
+
+    :return: DTPs as JSON-able dict object. Paths are nested.
+    :rtype: dict
+
+    """
+
+    if len(cohort_sizes) <= 0:
+        return None
+    else:
+        cohort_size = cohort_sizes[0]
+
+        path_outputs = []
+        possible_dlts = range(0, cohort_size+1)
+
+        for i, num_dlts in enumerate(possible_dlts):
+
+            # Invoke dose-decision
+            cohort_cases = [(next_dose, 1)] * num_dlts + [(next_dose, 0)] * (cohort_size - num_dlts)
+            cases = cases_already_observed + cohort_cases
+            if verbose:
+                print 'Running', cases
+            trial.reset()
+            mtd = trial.update(cases, **kwargs)
+            # Collect output
+            bag_o_tricks = OrderedDict([('Pat{}.{}'.format(cohort_number, j+1), 'Tox' if tox else 'No Tox')
+                                        for (j, (dose, tox)) in enumerate(cohort_cases)])
+
+            bag_o_tricks.update(OrderedDict([
+                        ('DoseGiven', atomic_to_json(next_dose)),
+                        ('RecommendedDose', atomic_to_json(mtd)),
+                        ('CohortSize', cohort_size),
+                        ('NumTox', atomic_to_json(num_dlts)),
+                    ]))
+            if custom_output_func:
+                bag_o_tricks.update(custom_output_func(trial))
+
+            # Recurse subsequent cohorts
+            further_paths = dose_transition_pathways_to_json(trial, next_dose=mtd, cohort_sizes=cohort_sizes[1:],
+                                                     cohort_number=cohort_number+1, cases_already_observed=cases,
+                                                     custom_output_func=custom_output_func, verbose=verbose,
+                                                     **kwargs)
+            if further_paths:
+                bag_o_tricks['Next'] = further_paths
+
+            path_outputs.append(bag_o_tricks)
+
+        return path_outputs
+
+
+dose_transition_pathways = dose_transition_pathways_to_json
 
 
 def _patient_outcome_to_label(po):

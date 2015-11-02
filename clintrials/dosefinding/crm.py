@@ -458,3 +458,19 @@ class CRM(DoseFindingTrial):
             phi = (np.sqrt(5)+1)/2.
             p.set_size_inches(12, 12/phi)
             # return p
+
+
+def crm_dtp_detail(trial):
+
+    from collections import OrderedDict
+    from clintrials.util import atomic_to_json
+
+    to_return = OrderedDict()
+
+    to_return['BetaHat'] = atomic_to_json(trial.beta_hat)
+    to_return['BetaVar'] = atomic_to_json(trial.beta_var)
+
+    for i, dl in enumerate(trial.dose_levels()):
+        to_return['ProbTox{}'.format(dl)] = trial.prob_tox()[i]
+
+    return to_return

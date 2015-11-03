@@ -156,7 +156,9 @@ class DoseFindingTrial(object):
         tab_data['Dose'] = self.dose_levels()
         tab_data['N'] = treated_at_dose
         tab_data['Toxicities'] = tox_at_dose
-        return pd.DataFrame(tab_data)
+        df = pd.DataFrame(tab_data)
+        df['ToxRate'] = np.where(df.N > 0, df.Toxicities / df.N, np.nan)
+        return df
 
     def set_next_dose(self, dose):
         """ Set the next dose that should be given. """
@@ -877,6 +879,7 @@ class EfficacyToxicityDoseFindingTrial(object):
     efficacies_at_dose(dose)
     maximum_dose_given()
     minimum_dose_given()
+    tabulate()
     set_next_dose(dose)
     next_dose()
     update(cases)
@@ -994,6 +997,21 @@ class EfficacyToxicityDoseFindingTrial(object):
             return min(self._doses)
         else:
             return None
+
+    def tabulate(self):
+        import pandas as pd
+        tab_data = OrderedDict()
+        treated_at_dose = [self.treated_at_dose(d) for d in self.dose_levels()]
+        eff_at_dose = [self.efficacies_at_dose(d) for d in self.dose_levels()]
+        tox_at_dose = [self.toxicities_at_dose(d) for d in self.dose_levels()]
+        tab_data['Dose'] = self.dose_levels()
+        tab_data['N'] = treated_at_dose
+        tab_data['Efficacies'] = eff_at_dose
+        tab_data['Toxicities'] = tox_at_dose
+        df = pd.DataFrame(tab_data)
+        df['EffRate'] = np.where(df.N > 0, df.Efficacies / df.N, np.nan)
+        df['ToxRate'] = np.where(df.N > 0, df.Toxicities / df.N, np.nan)
+        return df
 
     def set_next_dose(self, dose):
         """ Set the next dose that should be given. """

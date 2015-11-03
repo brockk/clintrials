@@ -4,14 +4,13 @@ __contact__ = 'kristian.brock@gmail.com'
 """ An implementation of Wages & Tait's adaptive Bayesian design for dose-finding in clinical trials.
 
 See:
-Wages, N.A. and Tait, C. (2014?). Seamless Phase I/II Adaptive Design For Oncology Trials of Molecularly Targeted Agents,
+Wages, N.A. and Tait, C. (2015). Seamless Phase I/II Adaptive Design For Oncology Trials of Molecularly Targeted Agents,
         Journal of Biopharmiceutical Statistics (preprint)
 
 """
 
 
 import numpy as np
-# import pandas as pd
 from scipy.stats import norm, beta
 from scipy.integrate import quad, trapz
 from random import sample

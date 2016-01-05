@@ -179,13 +179,13 @@ def summarise_sims(sims, ps, func_map, var_map=None, to_pandas=True):
             return [], []
 
 
-# Map-Reduce methods for summairsing sims in memory-efficient ways
-def map_reduce_sims(sim_files, map_func, reduce_func):
+# Map-Reduce methods for summarising sims in memory-efficient ways
+def map_reduce_files(files, map_func, reduce_func):
     """
     Invoke map_func on each file in sim_files and reduce results using reduce_func.
 
-    :param sim_files: list of files that contain simulations
-    :type sim_files: list
+    :param files: list of files that contain simulations
+    :type files: list
     :param map_func:function to create summary content for object x
     :type map_func: function
     :param reduce_func: function to reduce summary content of objects x & y
@@ -195,8 +195,8 @@ def map_reduce_sims(sim_files, map_func, reduce_func):
     :rtype: ?
 
     """
-    if len(sim_files):
-        x = map(map_func, sim_files)
+    if len(files):
+        x = map(map_func, files)
         return reduce(reduce_func, x)
     else:
         raise TypeError('No files')
@@ -206,7 +206,7 @@ def invoke_map_reduce_function_map(sims, function_map):
     """ Invokes map/reduce pattern for many items on a list of simulations.
     Functions are specified as "item name" -> (map_func, reduce_func) pairs in function_map.
     In each iteration, map_func is invoked on sims, and then reduce_func is invoked on result.
-    I.e. map_func takes list as single argument and reduce_func takes x and y as args.
+    As usual, map_func takes iterable as single argument and reduce_func takes x and y as args.
 
     Returns a dict with keys function_map.keys() and values the result of reduce_func
     """
@@ -220,6 +220,26 @@ def invoke_map_reduce_function_map(sims, function_map):
     return response
 
 
+def reduce_maps_by_summing(x, y):
+    """ Reduces maps x and y by adding the value of every item in x to matching value in y.
+
+    :param x: first map
+    :type x: dict
+    :param y: second map
+    :type y: dict
+    :returns: map of summed values
+    :rtype: dict
+
+    """
+
+    response = OrderedDict()
+    for k in x.keys():
+        response[k] = x[k] + y[k]
+    return response
+
+
+# I wrote the functions below during a specific analysis.
+# TODO: Do they make sense in a general package?
 def partition_and_aggregate(sims, ps, function_map):
     """ Function partitions simulations into subsets that used the same set of parameters,
     and then invokes a collection of map/reduce function pairs on each subset.
@@ -270,24 +290,6 @@ def fetch_partition_and_aggregate(f, ps, function_map, verbose=False):
     if verbose:
         print 'Fetched {} sims from {}'.format(len(sims), f)
     return partition_and_aggregate(sims, ps, function_map)
-
-
-def reduce_maps_by_summing(x, y):
-    """ Reduces maps x and y by adding the value of every item in x to matching value in y.
-
-    :param x: first map
-    :type x: dict
-    :param y: second map
-    :type y: dict
-    :returns: map of summed values
-    :rtype: dict
-
-    """
-
-    response = OrderedDict()
-    for k in x.keys():
-        response[k] = x[k] + y[k]
-    return response
 
 
 def reduce_product_of_two_files_by_summing(x, y):

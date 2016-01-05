@@ -108,7 +108,6 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     x = ln(d) - mean(ln(dose)) = [-0.5365, 0.1567, 0.3798]
 
     """
-
     if len(priors) != 6:
         raise ValueError('priors should have 6 items.')
 
@@ -126,7 +125,7 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     # generous, e.g. -1000 to 1000 would be stupid because the density at most points would be practically zero.
     # I use percentage points of the various prior distributions. The risk is that if the prior
     # does not cover the posterior range well, it will not estimate it well. This needs attention. TODO
-    epsilon = 0.0001
+    epsilon = 0.000001
     limits = [(dist.ppf(epsilon), dist.ppf(1-epsilon)) for dist in priors]
     samp = np.column_stack([np.random.uniform(*limit_pair, size=n) for limit_pair in limits])
 
@@ -134,8 +133,6 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
                               * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
                               * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
     pds = ProbabilityDensitySample(samp, lik_integrand)
-    # lik = lik_integrand(samp)
-    # scale = lik.mean()
 
     probs = []
     for x in scaled_doses:
@@ -151,7 +148,7 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     return probs, pds
     
     
-def efftox_get_posterior_params(cases, priors, scaled_doses, n=10 ** 5):
+def efftox_get_posterior_params(cases, priors, scaled_doses, n=10**5):
     """ Get the posterior parameter estimates after having observed cumulative data D in an EffTox trial.
 
     Note: This function evaluates the posterior integrals using Monte Carlo integration. Thall & Cook
@@ -198,7 +195,7 @@ def efftox_get_posterior_params(cases, priors, scaled_doses, n=10 ** 5):
     # generous, e.g. -1000 to 1000 would be stupid because the density at most points would be practically zero.
     # I use percentage points of the various prior distributions. The risk is that if the prior
     # does not cover the posterior range well, it will not estimate it well. This needs attention. TODO
-    epsilon = 0.0001
+    epsilon = 0.000001
     limits = [(dist.ppf(epsilon), dist.ppf(1-epsilon)) for dist in priors]
     samp = np.column_stack([np.random.uniform(*limit_pair, size=n) for limit_pair in limits])
 
@@ -206,19 +203,17 @@ def efftox_get_posterior_params(cases, priors, scaled_doses, n=10 ** 5):
                               * priors[0].pdf(x[:, 0]) * priors[1].pdf(x[:, 1]) * priors[2].pdf(x[:, 2]) \
                               * priors[3].pdf(x[:, 3]) * priors[4].pdf(x[:, 4]) * priors[5].pdf(x[:, 5])
     pds = ProbabilityDensitySample(samp, lik_integrand)
-    # lik = lik_integrand(samp)
-    # scale = lik.mean()
 
     params = []
     params.append(
-    	(
-        	pds.expectation(samp[:, 0]),
-	        pds.expectation(samp[:, 1]),
-	        pds.expectation(samp[:, 2]),
-	        pds.expectation(samp[:, 3]),
-	        pds.expectation(samp[:, 4]),
-	        pds.expectation(samp[:, 5]),
-    	)
+        (
+            pds.expectation(samp[:, 0]),
+            pds.expectation(samp[:, 1]),
+            pds.expectation(samp[:, 2]),
+            pds.expectation(samp[:, 3]),
+            pds.expectation(samp[:, 4]),
+            pds.expectation(samp[:, 5]),
+        )
     )
 
     return params, pds
@@ -470,7 +465,7 @@ ABC_Curve = InverseQuadraticCurve
 
 
 class EffTox(EfficacyToxicityDoseFindingTrial):
-    """ This is an object-oriented attempt at Thall & Cook's EffTox trial design.
+    """ This is an object-oriented implementation of Thall & Cook's EffTox trial design.
 
     See Thall, P.F. & Cook, J.D. (2004) - Dose-Finding Based on Efficacy-Toxicity Trade-Offs
 
@@ -513,23 +508,25 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def __init__(self, real_doses, theta_priors, tox_cutoff, eff_cutoff,
                  tox_certainty, eff_certainty, metric, max_size, first_dose=1,
-                 avoid_skipping_untried_escalation=True, avoid_skipping_untried_deescalation=True):
+                 avoid_skipping_untried_escalation=True, avoid_skipping_untried_deescalation=True,
+                 num_integral_steps=10**5):
         """
 
         Params:
-        real_doses, list of actual doses. E.g. for 10mg and 25mg, use [10, 25].
-        theta_priors, list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
-                        respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
-        tox_cutoff, the maximum acceptable probability of toxicity
-        eff_cutoff, the minimium acceptable probability of efficacy
-        tox_certainty, the posterior certainty required that toxicity is less than cutoff
-        eff_certainty, the posterior certainty required that efficacy is greater than than cutoff
-        metric, instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
-                of efficacy/toxicity probability pairs.
-        max_size, maximum number of patients to use
-        first_dose, starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
-        avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
-        avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
+        :param real_doses: list of actual doses. E.g. for 10mg and 25mg, use [10, 25].
+        :param theta_priors: list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
+                                respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
+        :param tox_cutoff: the maximum acceptable probability of toxicity
+        :param eff_cutoff: the minimium acceptable probability of efficacy
+        :param tox_certainty: the posterior certainty required that toxicity is less than cutoff
+        :param eff_certainty: the posterior certainty required that efficacy is greater than than cutoff
+        :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
+                        of efficacy/toxicity probability pairs.
+        :param max_size: maximum number of patients to use
+        :param first_dose: starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        :param avoid_skipping_untried_escalation: True to avoid skipping untried doses in escalation
+        :param avoid_skipping_untried_deescalation: True to avoid skipping untried doses in de-escalation
+        :param num_integral_steps: number of points to use in Monte Carlo integration.
 
         Note: dose_allocation_mode has been suppressed. Remove once I know it is not needed. KB
         # Instances have a dose_allocation_mode property that is set according to this schedule:
@@ -564,21 +561,17 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.metric = metric
         self.avoid_skipping_untried_escalation = avoid_skipping_untried_escalation
         self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
+        self.num_integral_steps = num_integral_steps
 
         # Reset
-        self.prob_tox = []
-        self.prob_eff = []
-        self.prob_acc_tox = []
-        self.prob_acc_eff = []
-        self.utility = []
-        # self.dose_allocation_mode = 0
-        # Estimate integrals
-        _ = self._update_integrals()
+        self.reset()
 
-    def _update_integrals(self, n=10**5):
+    def _update_integrals(self, n=None):
         """ Method to recalculate integrals, thus updating probabilties of eff and tox, utilities, and
             admissable set.
         """
+        if n is None:
+            n = self.num_integral_steps
         cases = zip(self._doses, self._toxicities, self._efficacies)
         post_probs, _pds = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                                      self.eff_cutoff, n)
@@ -600,7 +593,9 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.utility = utility
         self.pds = _pds
 
-    def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=10**5):
+    def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self, n=None):
+        if n is None:
+            n = self.num_integral_steps
         self._update_integrals(n)
         if self.treated_at_dose(self.first_dose()) > 0:
             # First dose has been tried so modelling may commence
@@ -615,7 +610,6 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                         pass  # No skipping
                     else:
                         self._status = 1
-                        #self.dose_allocation_mode = 1
                         self._next_dose = dose_level
                         break
             else:
@@ -638,10 +632,8 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self.prob_eff = []
         self.prob_acc_tox = []
         self.prob_acc_eff = []
+        self._admissable_set = []
         self.utility = []
-        # self.dose_allocation_mode = 0
-        # Estimate integrals
-        _ = self._update_integrals()
 
     def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
         """ Subclasses should override this method to perform an cases-specific processing. """
@@ -650,8 +642,10 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
-    def posterior_params(self, n=10**5):
+    def posterior_params(self, n=None):
         """ Get posterior parameter estimates """
+        if n is None:
+            n = self.num_integral_steps
         cases = zip(self._doses, self._toxicities, self._efficacies)
         post_params, pds = efftox_get_posterior_params(cases, self.priors, self._scaled_doses, n)
         return post_params
@@ -779,7 +773,6 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         return self._post_density_plot(func=get_utility, x_name='Utility', plot_title='Posterior densities of Utility',
                                        include_doses=include_doses, boot_samps=boot_samps)
 
-
     def prob_superior_utility(self, dl1, dl2):
         """ Returns the probability that the utility of dose-level 1 (dl1) exceeds that of dose-level 2 (dl2)
 
@@ -820,8 +813,6 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
                 superiority_mat[i-1, j-1] = p
                 superiority_mat[j-1, i-1] = 1-p
         return superiority_mat
-
-
 
 
 def solve_metrizable_efftox_scenario(prob_tox, prob_eff, metric, tox_cutoff, eff_cutoff):
@@ -1003,7 +994,7 @@ def _patient_outcome_to_label(po):
 
 
 def efftox_dose_transition_pathways(trial, next_dose, cohort_sizes, cohort_number=1, cases_already_observed=[],
-                                custom_output_func=None, verbose=False, **kwargs):
+                                    custom_output_func=None, verbose=False, **kwargs):
     """ Calculate dose-transition pathways for an efficacy-toxicity design.
 
     :param trial: subclass of EfficacyToxicityDoseFindingTrial that will determine the dose path

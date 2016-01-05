@@ -5,18 +5,17 @@ __contact__ = 'kristian.brock@gmail.com'
 """ Classes and functions for the PePs2 trial """
 
 from collections import OrderedDict
-from datetime import datetime
+import datetime
 import glob
+from itertools import product
 import json
+import logging
 import numpy as np
 import pandas as pd
-from scipy.optimize import fsolve
-from scipy.stats import norm, binom, uniform
 
 from clintrials.phase2 import Phase2EffToxBase
 from clintrials.stats import chi_squ_test, or_test, ProbabilityDensitySample
 from clintrials.util import correlated_binary_outcomes, atomic_to_json, iterable_to_json
-
 
 
 def pi_t(disease_status, mutation_status, alpha0=0, alpha1=0, alpha2=0):
@@ -110,7 +109,7 @@ def get_posterior_probs(D, priors, tox_cutoffs, eff_cutoffs, n=10**5):
     return probs, pds
 
 
-class PePs2BeBoP(Phase2EffToxBase):
+class PePS2BeBOP(Phase2EffToxBase):
 
     def __init__(self, theta_priors, tox_cutoffs, eff_cutoffs, tox_certainty, eff_certainty):
         """
@@ -337,168 +336,148 @@ class PePs2BryantAndDayStage(Phase2EffToxBase):
             return [0,0,0]
 
 
-def simulate_associated_eff_tox_outcomes(n, prob_eff, prob_tox, psi):
-    return correlated_binary_outcomes(n, (prob_eff, prob_tox), psi)
+def simulate_peps2_patients(num_patients, prob_pretreated, prob_mutated, params):
+    """
+    :param params: list of (prob_eff, prob_tox, efftox_or) tuples
 
-
-def simulate_peps2_patients(num_patients, prob_pretreated, prob_mutated, things):
-    """ Returns np.array with cols PreTreated, Mutated, Eff, Tox """
-    subsample_sizes = np.random.multinomial(num_patients, [(1-prob_pretreated)*(1-prob_mutated), (1-prob_pretreated)*prob_mutated,
-                                                           prob_pretreated*(1-prob_mutated), prob_pretreated*prob_mutated],
+    Returns 2-tuple. First item is np.array with binary variable cols PreTreated, PD-L1 +ve, Eff event, Tox event.
+                     Second item is tuple of groups sizes in C00, C01, C10, C11
+    """
+    subsample_sizes = np.random.multinomial(num_patients, [(1-prob_pretreated)*(1-prob_mutated),
+                                                           (1-prob_pretreated)*prob_mutated,
+                                                           prob_pretreated*(1-prob_mutated),
+                                                           prob_pretreated*prob_mutated],
                                             size=1)[0]
     n00, n01, n10, n11 = subsample_sizes
-
 
     statuses =  n00 * [[0,0]] + n01 * [[0,1]] + n10 * [[1,0]]  + n11 * [[1, 1]]
     statuses = np.array(statuses)
 
-    outcomes = [simulate_associated_eff_tox_outcomes(n, prob_eff, prob_tox, psi) for (n, (prob_eff, prob_tox, psi)) in
-                zip(subsample_sizes, things)]
+    outcomes = [correlated_binary_outcomes(n, (prob_eff, prob_tox), psi) for (n, (prob_eff, prob_tox, psi)) in
+                zip(subsample_sizes, params)]
     outcomes = np.vstack(outcomes)
 
     to_return = np.hstack([statuses, outcomes])
     np.random.shuffle(to_return)
-    # return to_return, (n11, n01, n10, n00)
     return to_return, (n00, n01, n10, n11)
+
+
+def simulate_peps2_trial_batch(model, num_patients, prob_pretreated, prob_biomarker, prob_effes, prob_toxes, efftox_ors,
+                                 num_batches, num_sims_per_batch, out_file=None):
+    sims = []
+    sims_object = {}
+    for i in range(num_batches):
+        these_sims = simulate_peps2_trial(model, num_patients=num_patients, prob_pretreated=prob_pretreated, prob_biomarker=prob_biomarker,
+                                          prob_effes=prob_effes, prob_toxes=prob_toxes, efftox_ors=efftox_ors,
+                                          num_sims=num_sims_per_batch, log_every=0)
+        sims = sims + these_sims
+        print 'Ran batch', i, datetime.datetime.now()
+
+        sims_object = OrderedDict()
+        sims_object['Parameters'] = peps2_parameters_report(num_patients=num_patients, prob_pretreated=prob_pretreated, prob_biomarker=prob_biomarker,
+                                                            prob_effes=prob_effes, prob_toxes=prob_toxes, efftox_ors=efftox_ors)
+        sims_object['Simulations'] = sims
+
+        if out_file:
+            try:
+                json.dump(sims_object, open(out_file, 'w'))
+            except:
+                import sys
+                e = sys.exc_info()[0]
+                logging.error(e.message)
+
+    return sims_object
 
 
 def get_corr(x):
     return np.corrcoef(x[:,0], x[:,1])[0,1]
 
 
-def simulate_trial(model_map, num_patients, prob_pretreated, prob_biomarker, prob_effes,
-                   prob_toxes, efftox_ors, num_sims=5, alpha=0.05, log_every=10):
+def peps2_parameters_report(num_patients, prob_pretreated, prob_biomarker, prob_effes, prob_toxes, efftox_ors):
+    parameters = OrderedDict()
+    parameters['NumPatients'] = atomic_to_json(num_patients)
+    parameters['Prob(Pretreated)'] = atomic_to_json(prob_pretreated)
+    parameters['Prob(PD-L1+)'] = atomic_to_json(prob_biomarker)
+    parameters['Prob(Efficacy)'] = iterable_to_json(prob_effes)
+    parameters['Prob(Toxicity)'] = iterable_to_json(prob_toxes)
+    parameters['Efficacy-Toxicity OR'] = iterable_to_json(efftox_ors)
+    parameters['Groups'] = ['Not pretreated, PD-L1 negative', 'Not pretreated, PD-L1 positive',
+                            'Pretreated, PD-L1 negative', 'Pretreated, PD-L1 positive']
+    # Derived parameters
+    pretreated_response_prob = prob_effes[3] * prob_biomarker + prob_effes[2] * (1 - prob_biomarker)
+    parameters['Prob(Efficacy | Pretreated)'] = atomic_to_json(pretreated_response_prob)
+    pretreated_response_odds = pretreated_response_prob / (1 - pretreated_response_prob)
+    parameters['Odds(Efficacy | Pretreated)'] = pretreated_response_odds
+    not_pretreated_response_prob = prob_effes[1] * prob_biomarker + prob_effes[0] * (1 - prob_biomarker)
+    parameters['Prob(Efficacy | !Pretreated'] = not_pretreated_response_prob
+    not_pretreated_response_odds = not_pretreated_response_prob / (1 - not_pretreated_response_prob)
+    parameters['Odds(Efficacy | !Pretreated)'] = not_pretreated_response_odds
+    pretreated_response_or = pretreated_response_odds / not_pretreated_response_odds
+    parameters['Efficacy OR for Pretreated'] = atomic_to_json(pretreated_response_or)
+    biomarker_pos_response_prob = prob_effes[3] * prob_pretreated + prob_effes[1] * (1 - prob_pretreated)
+    parameters['Prob(Efficacy | PD-L1+)'] = atomic_to_json(biomarker_pos_response_prob)
+    biomarker_pos_response_odds = biomarker_pos_response_prob / (1 - biomarker_pos_response_prob)
+    parameters['Odds(Efficacy | PD-L1+)'] = atomic_to_json(biomarker_pos_response_odds)
+    biomarker_neg_response_prob = prob_effes[2] * prob_pretreated + prob_effes[0] * (1 - prob_pretreated)
+    parameters['Prob(Efficacy | PD-L1-'] = atomic_to_json(biomarker_neg_response_prob)
+    biomarker_neg_response_odds = biomarker_neg_response_prob / (1 - biomarker_neg_response_prob)
+    parameters['Odds(Efficacy | PD-L1-)'] = atomic_to_json(biomarker_neg_response_odds)
+    biomarker_response_or = biomarker_pos_response_odds / biomarker_neg_response_odds
+    parameters['Efficacy OR for PD-L1 +vs-'] = atomic_to_json(biomarker_response_or)
 
-    decisions, pretreated_confints, mutated_confints = {}, {}, {}
-    group_sizes, eff_events, tox_events = np.empty((num_sims, 4)), np.empty((num_sims, 4)), np.empty((num_sims, 4))
+    return parameters
 
-    for k, v in model_map.iteritems():
-        decisions[k] = np.empty((num_sims, 4))
-        pretreated_confints[k] = np.empty((num_sims, 3))
-        mutated_confints[k] = np.empty((num_sims, 3))
 
+def simulate_peps2_trial(model, num_patients, prob_pretreated, prob_biomarker, prob_effes, prob_toxes, efftox_ors,
+                         num_sims=5, log_every=0):
+
+    sims = []
     for i in range(num_sims):
 
-        if i % log_every == 0:
-            print 'Iteration', i, datetime.now()
+        if log_every > 0 and i % log_every == 0:
+            print 'Iteration', i, datetime.datetime.now()
+
+        sim_output = OrderedDict()
 
         # Simulate patient statuses (x) and outcomes (y)
         x, n = simulate_peps2_patients(num_patients, prob_pretreated, prob_biomarker,  zip(prob_effes, prob_toxes, efftox_ors))
+        sim_output['PreTreated'] = [int(y) for y in x[:, 0]]
+        sim_output['PD-L1+'] = [int(y) for y in x[:, 1]]
+        sim_output['Efficacy'] = [int(y) for y in x[:, 2]]
+        sim_output['Toxicity'] = [int(y) for y in x[:, 3]]
         df = pd.DataFrame(x, columns=['PreTreated', 'Mutated', 'Eff', 'Tox'])
         df['One'] = 1
         grouped = df.groupby(['PreTreated','Mutated'])
         # Group sizes
         sub_df = grouped['One'].agg(np.sum)
-
         # Eff events by group
         num_pats = [sub_df.get((0,0), default=0), sub_df.get((0,1), default=0), sub_df.get((1,0), default=0), sub_df.get((1,1), default=0)]
-        group_sizes[i,:] = num_pats
+        sim_output['GroupSizes'] = num_pats
         # Eff events by group
         sub_df = grouped['Eff'].agg(np.sum)
-        num_effs = [sub_df.get((0,0), default=0), sub_df.get((0,1), default=0), sub_df.get((1,0), default=0), sub_df.get((1,1), default=0)]
-        eff_events[i,:] = num_effs
+        num_effs = [int(sub_df.get((0,0), default=0)), int(sub_df.get((0,1), default=0)), int(sub_df.get((1,0), default=0)), int(sub_df.get((1,1), default=0))]
+        sim_output['GroupEfficacies'] = num_effs
         # Tox events by group
         sub_df = grouped['Tox'].agg(np.sum)
-        num_toxs = [sub_df.get((0,0), default=0), sub_df.get((0,1), default=0), sub_df.get((1,0), default=0), sub_df.get((1,1), default=0)]
-        tox_events[i,:] = num_toxs
+        num_toxs = [int(sub_df.get((0,0), default=0)), int(sub_df.get((0,1), default=0)), int(sub_df.get((1,0), default=0)), int(sub_df.get((1,1), default=0))]
+        sim_output['GroupToxicities'] = num_toxs
 
+        model.reset()
+        model.update(x)
+        bebop_output = OrderedDict()
+        bebop_output['ProbEff'] = iterable_to_json(np.round(model.prob_eff, 4))
+        bebop_output['ProbTox'] = iterable_to_json(np.round(model.prob_tox, 4))
+        bebop_output['ProbAccEff'] = iterable_to_json(np.round(model.prob_acc_eff, 4))
+        bebop_output['ProbAccTox'] = iterable_to_json(np.round(model.prob_acc_tox, 4))
 
-        for k, v in model_map.iteritems():
-            v.reset()
-            v.update(x)
-            decisions[k][i,:] = [v.decision(j) for j in range(4)]
+        bebop_output['Efficacy OR for Pretreated'] = iterable_to_json(np.round(model.efficacy_effect(1), 4))
+        bebop_output['Efficacy OR for PD-L1 +vs-'] = iterable_to_json(np.round(model.efficacy_effect(2), 4))
 
-            try:
-                pretreated_confints[k][i,:] = v.efficacy_effect(1)
-            except:
-                pass
-            try:
-                mutated_confints[k][i,:] = v.efficacy_effect(2)
-            except:
-                pass
+        sim_output['BeBOP'] = bebop_output
 
-    # Make JSON-friendly report to return. Randomly sampled patient data plus design-specific statistical data.
-    # Each trial design has a top-level map, with sub-keys for Decisions, ConfInts, Events, etc
-    returnable = OrderedDict()
-    # Parameters
-    returnable['NumSims'] = atomic_to_json(num_sims)
-    returnable['NumPatients'] = atomic_to_json(num_patients)
-    returnable['Groups'] = iterable_to_json(['Not pretreated, biomarker negative', 'Not pretreated, biomarker positive',
-                                             'Pretreated, biomarker negative', 'Pretreated, biomarker positive'])
-    returnable['Prob(Pretreated)'] = atomic_to_json(prob_pretreated)
-    returnable['Prob(Biomarker)'] = atomic_to_json(prob_biomarker)
-    returnable['Prob(Efficacy)'] = iterable_to_json(prob_effes)
-    returnable['Prob(Toxicity)'] = iterable_to_json(prob_toxes)
-    returnable['Efficacy-Toxicity OR '] = iterable_to_json(efftox_ors)
-    returnable['Alpha'] = atomic_to_json(alpha)
-    # Derived parameters
-    pretreated_response_prob = prob_effes[3] * prob_biomarker + prob_effes[2] * (1 - prob_biomarker)
-    returnable['Prob(Response | Pretreated)'] = atomic_to_json(pretreated_response_prob)
-    pretreated_response_odds = pretreated_response_prob / (1 - pretreated_response_prob)
-    returnable['Odds(Response | Pretreated)'] = pretreated_response_odds
-    not_pretreated_response_prob = prob_effes[1] * prob_biomarker + prob_effes[0] * (1 - prob_biomarker)
-    returnable['Prob(Response | !Pretreated'] = not_pretreated_response_prob
-    not_pretreated_response_odds = not_pretreated_response_prob / (1 - not_pretreated_response_prob)
-    returnable['Odds(Response | !Pretreated)'] = not_pretreated_response_odds
-    pretreated_response_or = pretreated_response_odds / not_pretreated_response_odds
-    returnable['Response OR for Pretreated'] = atomic_to_json(pretreated_response_or)
-    biomarker_pos_response_prob = prob_effes[3] * prob_pretreated + prob_effes[1] * (1 - prob_pretreated)
-    returnable['Prob(Response | Biomarker)'] = atomic_to_json(biomarker_pos_response_prob)
-    biomarker_pos_response_odds = biomarker_pos_response_prob / (1 - biomarker_pos_response_prob)
-    returnable['Odds(Response | Biomarker)'] = atomic_to_json(biomarker_pos_response_odds)
-    biomarker_neg_response_prob = prob_effes[2] * prob_pretreated + prob_effes[0] * (1 - prob_pretreated)
-    returnable['Prob(Response | !Biomarker'] = atomic_to_json(biomarker_neg_response_prob)
-    biomarker_neg_response_odds = biomarker_neg_response_prob / (1 - biomarker_neg_response_prob)
-    returnable['Odds(Response | !Biomarker)'] = atomic_to_json(biomarker_neg_response_odds)
-    biomarker_response_or = biomarker_pos_response_odds / biomarker_neg_response_odds
-    returnable['Response OR for Biomarker'] = atomic_to_json(biomarker_response_or)
-    # Non-method-specific data
-    returnable['Group Sizes'] = [iterable_to_json(x) for x in group_sizes]
-    returnable['Efficacy Events'] = [iterable_to_json(x) for x in eff_events]
-    returnable['Toxicity Events'] = [iterable_to_json(x) for x in tox_events]
-    # Method-specific data
-    for k, v in model_map.iteritems():
-        method_report = OrderedDict()
-        method_report['Decisions'] = [iterable_to_json(x) for x in decisions[k]]
-        method_report['Response OR for Pretreated'] = [iterable_to_json(np.round(x, 4)) for x in pretreated_confints[k]]
-        method_report['Response OR for Biomarker Positive'] = [iterable_to_json(np.round(x, 4)) for x in mutated_confints[k]]
-        returnable[k] = method_report
+        sims.append(sim_output)
 
-    return returnable
-
-
-def tell_me_about_results(sims):
-    pretreated_response_or = sims['Response OR for Pretreated']
-    biomarker_response_or = sims['Response OR for Biomarker']
-    n_pats = sims['NumPatients']
-
-    print 'Events'
-    print 'Efficacies:', sum(np.mean(sims['Efficacy Events'], axis=0))
-    print 'Efficacy %:', sum(np.mean(sims['Efficacy Events'], axis=0)) / n_pats
-    print 'Toxicities:', sum(np.mean(sims['Toxicity Events'], axis=0))
-    print 'Toxicity %:', sum(np.mean(sims['Toxicity Events'], axis=0)) / n_pats
-    print
-    print 'By Group'
-    print 'Size', sum(np.mean(sims['Group Sizes'], axis=0)), np.mean(sims['Group Sizes'], axis=0)
-    print 'Efficacies:', np.mean(sims['Efficacy Events'], axis=0)
-    print 'Efficacy %:', np.nanmean( np.array(sims['Efficacy Events']) / np.array(sims['Group Sizes']),  axis=0)
-    print 'Toxicities:', np.mean(sims['Toxicity Events'], axis=0)
-    print 'Toxicity %:', np.nanmean( np.array(sims['Toxicity Events']) / np.array(sims['Group Sizes']),  axis=0)
-    print
-    print 'Approve Treatment'
-    print 'BD', np.mean(sims['B&D+ChiSqu']['Decisions'], axis=0)
-    print 'BBB', np.mean(sims['BBB']['Decisions'], axis=0)
-    print
-    print 'Coverage'
-    print 'True Pretreated & PD-L1 ORs:', pretreated_response_or, biomarker_response_or
-    print 'BD Pretreated CI Coverage:', np.mean((pretreated_response_or > np.array(sims['B&D+ChiSqu']['Response OR for Pretreated'])[:,0]) &
-            (pretreated_response_or < np.array(sims['B&D+ChiSqu']['Response OR for Pretreated'])[:,2]))
-    print 'BBB Pretreated CI Coverage:', np.mean((pretreated_response_or > np.array(sims['BBB']['Response OR for Pretreated'])[:,0]) &
-            (pretreated_response_or < np.array(sims['BBB']['Response OR for Pretreated'])[:,2]))
-    print 'BD PD-PL+ CI Coverage:', np.mean((biomarker_response_or > np.array(sims['B&D+ChiSqu']['Response OR for Biomarker Positive'])[:,0]) &
-            (biomarker_response_or < np.array(sims['B&D+ChiSqu']['Response OR for Biomarker Positive'])[:,2]))
-    print 'BBB PD-PL+ CI Coverage:', np.mean((biomarker_response_or > np.array(sims['BBB']['Response OR for Biomarker Positive'])[:,0]) &
-            (biomarker_response_or < np.array(sims['BBB']['Response OR for Biomarker Positive'])[:,2]))
+    return sims
 
 
 def splice_sims(in_files_pattern, out_file=None):
@@ -537,3 +516,66 @@ def splice_sims(in_files_pattern, out_file=None):
         json.dump(sims, open(out_file, 'w'))
     else:
         return sims
+
+
+from itertools import product
+
+def tell_me_about_results(sims, eff_certainty_schemas=[[0.8] * 4, [0.7] * 4],
+                          tox_certainty_schemas=[[0.8] * 4, [0.7] * 4]):
+    pretreated_efficacy_or = sims['Parameters']['Efficacy OR for Pretreated']
+    pdl1_efficacy_or = sims['Parameters']['Efficacy OR for PD-L1 +vs-']
+
+    num_sims = len(sims['Simulations'])
+    n_by_group = reduce(lambda x, y: np.array(x) + np.array(y), map(lambda x: x['GroupSizes'],
+                                                                    sims['Simulations']))
+    eff_by_group = reduce(lambda x, y: np.array(x) + np.array(y), map(lambda x: x['GroupEfficacies'],
+                                                                      sims['Simulations']))
+    tox_by_group = reduce(lambda x, y: np.array(x) + np.array(y), map(lambda x: x['GroupToxicities'],
+                                                                      sims['Simulations']))
+    pretreated_efficacy_or_ci = np.array(map(lambda x: x['BeBOP']['Efficacy OR for Pretreated'], sims['Simulations']))
+    pdl1_efficacy_or_ci = np.array(map(lambda x: x['BeBOP']['Efficacy OR for PD-L1 +vs-'], sims['Simulations']))
+
+    print 'Params:'
+    print 'Prob(Eff):', sims['Parameters']['Prob(Efficacy)']
+    print 'Prob(Tox):', sims['Parameters']['Prob(Toxicity)']
+    print 'Eff-Tox OR:', sims['Parameters']['Efficacy-Toxicity OR']
+    print 'Prob(PreTreated):', sims['Parameters']['Prob(Pretreated)']
+    print 'Prob(PD-L1+):', sims['Parameters']['Prob(PD-L1+)']
+    print
+    print 'NumSims:', num_sims
+    print
+    print 'Events:'
+    print 'Efficacy %:', 1. * sum(eff_by_group) / sum(n_by_group)
+    print 'Toxicity %:', 1. * sum(tox_by_group) / sum(n_by_group)
+    print
+    print 'By Group:'
+    print 'Size:', 1. * n_by_group / num_sims
+    print 'Efficacies:', 1. * eff_by_group / num_sims
+    print 'Efficacy %:', 1. * eff_by_group / n_by_group
+    print 'Toxicities:', 1. * tox_by_group / num_sims
+    print 'Toxicity %:', 1. * tox_by_group / n_by_group
+    print
+    print
+    print 'BeBOP:'
+    print
+    print 'Posterior:'
+    print 'Prob(Eff):', np.array(map(lambda x: x['BeBOP']['ProbEff'], sims['Simulations'])).mean(axis=0)
+    print 'Prob(AccEff):', np.array(map(lambda x: x['BeBOP']['ProbAccEff'], sims['Simulations'])).mean(axis=0)
+    print 'Prob(Tox):', np.array(map(lambda x: x['BeBOP']['ProbTox'], sims['Simulations'])).mean(axis=0)
+    print 'Prob(AccTox):', np.array(map(lambda x: x['BeBOP']['ProbAccTox'], sims['Simulations'])).mean(axis=0)
+    print
+    print 'Approve Treatment:'
+    for eff_certainty, tox_certainty in product(eff_certainty_schemas, tox_certainty_schemas):
+        accept_eff = np.array(map(lambda x: x['BeBOP']['ProbAccEff'], sims['Simulations'])) > np.array(eff_certainty)
+        accept_tox = np.array(map(lambda x: x['BeBOP']['ProbAccTox'], sims['Simulations'])) > np.array(tox_certainty)
+        print eff_certainty, tox_certainty, (accept_eff & accept_tox).mean(axis=0)
+    print
+    print 'BeBOP Coverage:'
+    print 'Pre-Treated:'
+    print 'True OR:', pretreated_efficacy_or
+    print 'Coverage:', np.mean(map(lambda x: (pretreated_efficacy_or > x[0]) and (pretreated_efficacy_or < x[2]),
+                                   pretreated_efficacy_or_ci))
+    print 'PD-L1:'
+    print 'True OR:', pdl1_efficacy_or
+    print 'Coverage:', np.mean(map(lambda x: (pdl1_efficacy_or > x[0]) and (pdl1_efficacy_or < x[2]),
+                                   pdl1_efficacy_or_ci))

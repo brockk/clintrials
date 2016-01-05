@@ -2,7 +2,7 @@ __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
 
-__all__ = ["crm", "efftox", "novel", "wagestait"]
+__all__ = ["crm", "efftox", "wagestait", "watu"]
 
 
 import abc
@@ -1449,8 +1449,10 @@ def _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_od
 
     # Report findings
     report = OrderedDict()
-    report['TrueToxicities'] = iterable_to_json(true_toxicities)
-    report['TrueEfficacies'] = iterable_to_json(true_efficacies)
+    # report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    # report['TrueEfficacies'] = iterable_to_json(true_efficacies)
+    # Do not parrot back parameters
+
     if conduct_trial:
         report['RecommendedDose'] = atomic_to_json(design.next_dose())
         report['TrialStatus'] = atomic_to_json(design.status())
@@ -1474,8 +1476,8 @@ def _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_od
                 eff_hat = eff_horizons.mean(axis=0)
 
             optimal_allocation = design.optimal_decision(tox_hat, eff_hat)
-            report['FullyInformedToxicityCurve'] = iterable_to_json(tox_hat)
-            report['FullyInformedEfficacyCurve'] = iterable_to_json(eff_hat)
+            report['FullyInformedToxicityCurve'] = iterable_to_json(np.round(tox_hat, 4))
+            report['FullyInformedEfficacyCurve'] = iterable_to_json(np.round(eff_hat, 4))
             report['OptimalAllocation'] = atomic_to_json(optimal_allocation)
         except NotImplementedError:
             pass
@@ -1590,8 +1592,10 @@ def simulate_efficacy_toxicity_dose_finding_trials(design_map, true_toxicities, 
                      'to appreciate this when calculating optimal decisions.')
 
     report = OrderedDict()
-    report['TrueToxicities'] = iterable_to_json(true_toxicities)
-    report['TrueEfficacies'] = iterable_to_json(true_efficacies)
+    # report['TrueToxicities'] = iterable_to_json(true_toxicities)
+    # report['TrueEfficacies'] = iterable_to_json(true_efficacies)
+    # Do not parrot back parameters
+
     for label, design in design_map.iteritems():
         this_sim = _simulate_eff_tox_trial(design, true_toxicities, true_efficacies, tox_eff_odds_ratio, tolerances,
                                            cohort_size, conduct_trial, calculate_optimal_decision)

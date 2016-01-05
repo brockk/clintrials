@@ -16,7 +16,6 @@ Berry, Carlin, Lee and Mueller. Bayesian Adaptive Methods for Clinical Trials, C
 
 
 import numpy as np
-# import pandas as pd
 from scipy.stats import norm, beta
 from random import sample
 
@@ -25,11 +24,10 @@ from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
 from clintrials.dosefinding.crm import CRM
 from clintrials.dosefinding.efftox import solve_metrizable_efftox_scenario
 from clintrials.dosefinding.wagestait import wt_get_theta_hat
-from clintrials.util import correlated_binary_outcomes_from_uniforms
 
 
-class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial):
-    """ This is Brock & Yap's fusion of Wages & Tait adaptive phase I/II design with EffTox's utility contours.
+class WATU(EfficacyToxicityDoseFindingTrial):
+    """ Brock & Yap's fusion of Wages & Tait adaptive phase I/II design with Thall & Cook's EffTox utility contours.
 
     See Wages, N.A. & Tait, C. - Seamless Phase I/II Adaptive Design For Oncology Trials
                     of Molecularly Targeted Agents, to appear in Journal of Biopharmaceutical Statistics
@@ -81,37 +79,41 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
                  first_dose, max_size, stage_one_size=0,
                  F_func=empiric, inverse_F=inverse_empiric,
                  theta_prior=norm(0, np.sqrt(1.34)), beta_prior=norm(0, np.sqrt(1.34)),
-                 tox_certainty=0.05, deficient_efficacy_alpha=0.05,
+                 tox_certainty=0.05, eff_certainty=0.05,
                  model_prior_weights=None, use_quick_integration=True, estimate_var=True,
-                 prevent_skipping_untolerated=True, must_try_lowest_dose=True):
+                 avoid_skipping_untried_escalation_stage_1=True, avoid_skipping_untried_deescalation_stage_1=True,
+                 avoid_skipping_untried_escalation_stage_2=True, avoid_skipping_untried_deescalation_stage_2=True,
+                 must_try_lowest_dose=True # Plumb in
+                 ):
         """
 
-        Params:
-        skeletons, 2-d matrix of skeletons, i.e. list of prior efficacy scenarios, one scenario per row
-        prior_tox_probs, list of prior probabilities of toxicity, from least toxic to most
-        tox_target, target probability of toxicity in CRM
-        tox_limit, the maximum acceptable probability of toxicity
-        eff_limit, the minimum acceptable probability of efficacy
-        metric, instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
-                of efficacy/toxicity probability pairs.
-        first_dose, starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
-        max_size, maximum number of patients to use in trial
-        stage_one_size, size of the first stage of the trial, where dose is set by a latent CRM model only,
+        :param skeletons: 2-d matrix of skeletons, i.e. list of prior efficacy scenarios, one scenario per row
+        :param prior_tox_probs: list of prior probabilities of toxicity, from least toxic to most
+        :param tox_target: target probability of toxicity in CRM
+        :param tox_limit: the maximum acceptable probability of toxicity
+        :param eff_limit: the minimum acceptable probability of efficacy
+        :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility of efficacy/toxicity
+                        probability pairs.
+        :param first_dose: starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
+        :param max_size: maximum number of patients to use in trial
+        :param stage_one_size: size of the first stage of the trial, where dose is set by a latent CRM model only,
                         i.e. only toxicity monitoring is performed with no attempt to monitor efficacy. 0 by default
-        F_func and inverse_F, the link function and inverse for CRM method, e.g. logistic and inverse_logistic
-        theta_prior, prior distibution for theta parameter, the single parameter in the efficacy models
-        beta_prior, prior distibution for beta parameter, the single parameter in the toxicity CRM model
-        tox_certainty, significance to use when testing that lowest dose exceeds toxicity limit
-        deficient_efficacy_alpha, significance to use when testing that optimal dose has efficacy less than
-                                    efficacy limit
-        model_prior_weights, vector of prior probabilities that each model is correct. None to use uniform weights
-        use_quick_integration, numerical integration is slow. Set this to False to use the most accurate (slowest)
-                                method; False to use a quick but approximate method.
-                                In simulations, fast and approximate often suffices.
-                                In trial scenarios, use slow and accurate!
-        estimate_var, True to estimate the posterior variances of theta and beta
-        prevent_skipping_untolerated, Unused, TODO
-        must_try_lowest_dose, Unused, TODO
+        :param F_func: the link function for CRM method, e.g. logistic
+        :param inverse_F: the inverse link function for CRM method, e.g. inverse_logistic
+        :param theta_prior: prior distibution for theta parameter, the single parameter in the efficacy models
+        :param beta_prior: prior distibution for beta parameter, the single parameter in the toxicity CRM model
+        :param tox_certainty: significance to use when testing that lowest dose exceeds toxicity limit
+        :param model_prior_weights: vector of prior probabilities that each model is correct. None to use uniform weights
+        :param use_quick_integration: numerical integration is slow. Set this to False to use the most accurate (slowest)
+                                        method; True to use a quick but approximate method.
+                                        In simulations, fast and approximate often suffices.
+                                        In trial scenarios, I use slow and accurate.
+        :param estimate_var: True to estimate the posterior variances of theta and beta
+        :param avoid_skipping_untried_escalation_stage_1: True to avoid skipping untried doses in escalation in stage 1
+        :param avoid_skipping_untried_deescalation_stage_1: True to avoid skipping untried doses in de-escalation in stage 1
+        :param avoid_skipping_untried_escalation_stage_2: True to avoid skipping untried doses in escalation in stage 2
+        :param avoid_skipping_untried_deescalation_stage_2: True to avoid skipping untried doses in de-escalation in stage 2
+        :param must_try_lowest_dose: Unused, TODO
 
         """
 
@@ -122,6 +124,7 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         if self.I != len(prior_tox_probs):
             ValueError('prior_tox_probs should have %s items.' % self.I)
         self.prior_tox_probs = prior_tox_probs
+        self.tox_target = tox_target
         self.tox_limit = tox_limit
         self.eff_limit = eff_limit
         self.metric = metric
@@ -131,8 +134,8 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.theta_prior = theta_prior
         self.beta_prior = beta_prior
         self.tox_certainty = tox_certainty
-        self.deficient_efficacy_alpha = deficient_efficacy_alpha
-        if model_prior_weights:
+        self.eff_certainty = eff_certainty
+        if model_prior_weights is not None:
             if self.K != len(model_prior_weights):
                 ValueError('model_prior_weights should have %s items.' % self.K)
             if sum(model_prior_weights) == 0:
@@ -142,6 +145,11 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
             self.model_prior_weights = np.ones(self.K) / self.K
         self.use_quick_integration = use_quick_integration
         self.estimate_var = estimate_var
+        self.avoid_skipping_untried_escalation_stage_1 = avoid_skipping_untried_escalation_stage_1
+        self.avoid_skipping_untried_deescalation_stage_1 = avoid_skipping_untried_deescalation_stage_1
+        self.avoid_skipping_untried_escalation_stage_2 = avoid_skipping_untried_escalation_stage_2
+        self.avoid_skipping_untried_deescalation_stage_2 = avoid_skipping_untried_deescalation_stage_2
+        self.must_try_lowest_dose = must_try_lowest_dose # TODO: plumb this in
 
         # Reset
         self.most_likely_model_index = \
@@ -150,66 +158,33 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.crm = CRM(prior=prior_tox_probs, target=tox_target, first_dose=first_dose, max_size=max_size,
                        F_func=empiric, inverse_F=inverse_empiric, beta_prior=beta_prior,
                        use_quick_integration=use_quick_integration, estimate_var=estimate_var,
-                       avoid_skipping_untried_escalation=True)
+                       avoid_skipping_untried_escalation=avoid_skipping_untried_escalation_stage_1,
+                       avoid_skipping_untried_deescalation=avoid_skipping_untried_deescalation_stage_1)
         self.post_tox_probs = np.zeros(self.I)
         self.post_eff_probs = np.zeros(self.I)
         self.theta_hats = np.zeros(self.K)
+        self.theta_vars = np.zeros(self.K)
 
         self.utility = []
         self.dose_allocation_mode = 0
 
-        self.prevent_skipping_untolerated = prevent_skipping_untolerated  # TODO: plumb these in
-        self.must_try_lowest_dose = must_try_lowest_dose
-
-    def dose_toxicity_lower_bound(self, dose_level, alpha=0.05):
-        """ Get lower bound of toxicity probability at a dose-level using the Clopper-Pearson aka Beta aka exact method.
-
-        Params:
-        dose-level, 1-based index of dose level
-        alpha, significance level, i.e. alpha% of probabilities will be less than response
-
-        Returns: a probability
-
-        """
-        if 0 < dose_level <= len(self.post_tox_probs):
-            n = self.treated_at_dose(dose_level)
-            x = self.toxicities_at_dose(dose_level)
-            if n > 0:
-                ci = beta(x, n-x+1).ppf(alpha/2), beta(x+1, n-x).ppf(1-alpha/2)
-                return ci[0]
-        # Default
-        return np.NaN
-
-    def dose_efficacy_upper_bound(self, dose_level, alpha=0.05):
-        """ Get upper bound of efficacy probability at a dose-level using the Clopper-Pearson aka Beta aka exact method.
-
-        Params:
-        dose-level, 1-based index of dose level
-        alpha, significance level, i.e. alpha% of probabilities will be greater than response
-
-        Returns: a probability
-
-        """
-        if 0 < dose_level <= len(self.post_eff_probs):
-            n = self.treated_at_dose(dose_level)
-            x = self.efficacies_at_dose(dose_level)
-            if n > 0:
-                ci = beta(x, n-x+1).ppf(alpha/2), beta(x+1, n-x).ppf(1-alpha/2)
-                return ci[1]
-        # Default
-        return np.NaN
 
     def model_theta_hat(self):
         """ Return theta hat for the model with the highest posterior likelihood, i.e. the current model. """
         return self.theta_hats[self.most_likely_model_index]
 
+    def model_theta_var(self):
+        """ Return theta var for the model with the highest posterior likelihood, i.e. the current model. """
+        return self.theta_vars[self.most_likely_model_index]
+
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
         cases = zip(self._doses, self._toxicities, self._efficacies)
         # Update parameters for efficacy estimates
         integrals = wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
-                                     use_quick_integration=self.use_quick_integration, estimate_var=False)
+                                     use_quick_integration=self.use_quick_integration, estimate_var=True)
         theta_hats, theta_vars, model_probs = zip(*integrals)
         self.theta_hats = theta_hats
+        self.theta_vars = theta_vars
         w = self.model_prior_weights * model_probs
         self.w = w / sum(w)
         most_likely_model_index = np.argmax(w)
@@ -226,15 +201,6 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         else:
             self._next_dose = self._stage_two_next_dose(self.post_tox_probs, self.post_eff_probs)
 
-        # Stop if upper bound of efficacy at optimum dose is less than eff_limit
-        # TODO: In time, change this rule to use posterior probabilities too, like the way toxicity is
-        # tested in _stage_one_next_dose and _stage_two_next_dose.
-        if self.size() >= self.stage_one_size:
-            if self.dose_efficacy_upper_bound(self._next_dose, self.deficient_efficacy_alpha) < self.eff_limit:
-                self._status = -4
-                self._next_dose = -1
-                self._admissable_set = []
-
         return self._next_dose
 
     def _EfficacyToxicityDoseFindingTrial__reset(self):
@@ -245,6 +211,7 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
         self.post_tox_probs = np.zeros(self.I)
         self.post_eff_probs = np.zeros(self.I)
         self.theta_hats = np.zeros(self.K)
+        self.theta_vars = np.zeros(self.K)
         self.crm.reset()
 
     def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
@@ -278,49 +245,102 @@ class BrockYapEfficacyToxicityDoseFindingTrial(EfficacyToxicityDoseFindingTrial)
                                                                               self.tox_limit, self.eff_limit)
         return obd
 
+    def prob_eff_exceeds(self, eff_cutoff, n=10**6):
+
+        # Estimate probability of efficacy exceeds eff_cutoff using plug-in mean and variance for theta
+        # and randomly sampling values from normal. Why normal? Because the prior for is normal and the posterior
+        # is asymptotically normal. For low n, non-normality may lead to bias.
+        # TODO: research replacing this with a proper posterior integral
+        theta_sample = norm(loc=self.model_theta_hat(), scale=np.sqrt(self.model_theta_var())).rvs(n)
+        p0_sample = [empiric(prob, beta=theta_sample) for prob in self.skeletons[self.most_likely_model_index]]
+        return np.array([np.mean(x > eff_cutoff) for x in p0_sample])
+
+    def prob_acc_eff(self, threshold=None, **kwargs):
+        if threshold is None:
+            threshold = self.eff_limit
+        return self.prob_eff_exceeds(threshold, **kwargs)
+
+    def prob_acc_tox(self, threshold=None, **kwargs):
+        if threshold is None:
+            threshold = self.tox_limit
+        return 1 - self.crm.prob_tox_exceeds(threshold, **kwargs)
+
     # Private interface
     def _stage_one_next_dose(self):
-        # There is no scrutiny of what is efficable in 'admissable'
-        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)
-        admissable = [x < (1-self.tox_certainty) for x in prob_unacc_tox]
+
+        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)  # TODO: make n=10**5 editable
+        prob_unacc_eff = 1 - self.prob_eff_exceeds(self.eff_limit, n=10**5)
+        admissable = [(prob_tox < (1-self.tox_certainty)) and (prob_eff < (1-self.eff_certainty))
+                      for (prob_eff, prob_tox) in zip(prob_unacc_eff, prob_unacc_tox)]
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         self._admissable_set = admissable_set
-        if sum(admissable) > 0:
-            self._status = 1
-            self.dose_allocation_mode = 0.5  # TODO
-            return self.crm.next_dose()
+
+        if self.size() > 0:
+            # Trial has started so modelling may commence
+            max_dose_given = self.maximum_dose_given()
+            min_dose_given = self.minimum_dose_given()
+            attractiveness = np.abs(np.array(self.crm.prob_tox()) - self.tox_target)  # Rank as proximity to tox target
+            for i in np.argsort(attractiveness):  # dose-indices from closest to farthest from tox target
+                dose_level = i+1
+                if dose_level in admissable_set:
+                    if (self.avoid_skipping_untried_escalation_stage_1 and max_dose_given
+                        and dose_level - max_dose_given > 1):
+                        pass  # No skipping in escalation
+                    elif (self.avoid_skipping_untried_deescalation_stage_1 and min_dose_given
+                          and min_dose_given - dose_level > 1):
+                        pass  # No skipping in de-escalation
+                    else:
+                        self._status = 1
+                        self._next_dose = dose_level
+                        break
+            else:
+                # No dose can be selected so stop
+                self._next_dose = -1
+                self._status = -1
         else:
-            # All doses are too toxic so stop trial
-            self._status = -1
-            self.dose_allocation_mode = 0
-            return -1
+            # Trial has not yet started
+            self._next_dose = self.first_dose()
+            self._status = -10
+
+        return self._next_dose
 
     def _stage_two_next_dose(self, tox_probs, eff_probs):
-        # There is no scrutiny of what is efficable in 'admissable'
-        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5)
-        admissable = [x < (1-self.tox_certainty) for x in prob_unacc_tox]
+
+        prob_unacc_tox = self.crm.prob_tox_exceeds(self.tox_limit, n=10**5) # TODO: make n=10**5 editable
+        prob_unacc_eff = 1 - self.prob_eff_exceeds(self.eff_limit, n=10**5)
+        admissable = [(prob_tox < (1-self.tox_certainty)) and (prob_eff < (1-self.eff_certainty))
+                      for (prob_eff, prob_tox) in zip(prob_unacc_eff, prob_unacc_tox)]
         admissable_set = [i+1 for i, x in enumerate(admissable) if x]
         self._admissable_set = admissable_set
         # Beware: I normally use (tox, eff) pairs but the metric expects (eff, tox) pairs, driven
         # by the equation form that Thall & Cook chose.
         utility = np.array([self.metric(x[0], x[1]) for x in zip(eff_probs, tox_probs)])
         self.utility = utility
-        if sum(admissable) > 0:
-            # Select most desirable dose from admissable set
-            masked_util = np.where(admissable, utility, np.nan)
-            ideal_dose = np.nanargmax(masked_util) + 1
+
+        if self.size() > 0:
+            # Trial has started so modelling may commence
             max_dose_given = self.maximum_dose_given()
-            if max_dose_given and ideal_dose - max_dose_given > 1:
-                # Prevent skipping untried doses in escalation
-                self._status = 1
-                self.dose_allocation_mode = 2
-                return max_dose_given + 1
+            min_dose_given = self.minimum_dose_given()
+            for i in np.argsort(-utility):  # dose-indices from highest to lowest utility
+                dose_level = i+1
+                if dose_level in admissable_set:
+                    if (self.avoid_skipping_untried_escalation_stage_2 and max_dose_given
+                        and dose_level - max_dose_given > 1):
+                        pass  # No skipping in escalation
+                    elif (self.avoid_skipping_untried_deescalation_stage_2 and min_dose_given
+                          and min_dose_given - dose_level > 1):
+                        pass  # No skipping in de-escalation
+                    else:
+                        self._status = 1
+                        self._next_dose = dose_level
+                        break
             else:
-                self._status = 1
-                self.dose_allocation_mode = 1
-                return ideal_dose
+                # No dose can be selected so stop
+                self._next_dose = -1
+                self._status = -1
         else:
-            # All doses are too toxic so stop trial
-            self._status = -1
-            self.dose_allocation_mode = 0
-            return -1
+            # Trial has not yet started
+            self._next_dose = self.first_dose()
+            self._status = -10
+
+        return self._next_dose

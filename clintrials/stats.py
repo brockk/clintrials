@@ -9,6 +9,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde, chi2, norm
+from scipy.optimize import fsolve
 
 
 def bootstrap(x):

@@ -1,6 +1,7 @@
 __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
+from collections import OrderedDict
 import logging
 import numpy as np
 from scipy.stats import norm
@@ -9,6 +10,7 @@ from scipy.optimize import minimize
 
 from clintrials.dosefinding import DoseFindingTrial
 from clintrials.common import empiric, logistic, inverse_empiric, inverse_logistic
+from clintrials.util import atomic_to_json, iterable_to_json
 
 
 def toxicity_likelihood(link_func, a0, beta, dose, tox, log=False):
@@ -304,6 +306,10 @@ class CRM(DoseFindingTrial):
         return
 
     def _DoseFindingTrial__calculate_next_dose(self):
+
+        current_dose = self.next_dose()
+        max_dose_given = self.maximum_dose_given()
+        min_dose_given = self.minimum_dose_given()
         proposed_dose, beta_hat, beta_var = crm(prior=self.prior, target=self.target, toxicities=self._toxicities,
                                                 dose_levels=self._doses, first_dose=self._first_dose,
                                                 F_func=self.F_func, inverse_F=self.inverse_F,
@@ -313,9 +319,7 @@ class CRM(DoseFindingTrial):
         self.beta_hat = beta_hat
         self.beta_var = beta_var
 
-        current_dose = self.next_dose()
-        max_dose_given = self.maximum_dose_given()
-        min_dose_given = self.minimum_dose_given()
+        # print current_dose, max_dose_given, min_dose_given, proposed_dose
 
         # Excess toxicity at lowest dose?
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:
@@ -331,11 +335,15 @@ class CRM(DoseFindingTrial):
 
         # Coherency
         if self.coherency_threshold and proposed_dose > current_dose:
+            # print 'Testing coherence'
             tox_rate_at_current = self.observed_toxicity_rates()[current_dose-1]
+            # print 'Tox at current', tox_rate_at_current
             if not np.isnan(tox_rate_at_current) and tox_rate_at_current > self.coherency_threshold:
                 # Avoid escalation. Stay at current
+                # print 'Throttling for coherence'
                 proposed_dose = current_dose
                 return proposed_dose
+
         # Skipping doses
         if self.avoid_skipping_untried_escalation and max_dose_given and proposed_dose - max_dose_given > 1:
             # Avoid skipping untried doses in escalation by setting proposed dose to max_dose_given + 1
@@ -471,15 +479,18 @@ class CRM(DoseFindingTrial):
 
 
 def crm_dtp_detail(trial):
+    """ Performs the CRM-specific extra reporting when calculating DTPs
+    :param trial: instance of CRM
+    :return: OrderedDict
 
-    from collections import OrderedDict
-    from clintrials.util import atomic_to_json
+    """
 
     to_return = OrderedDict()
 
     to_return['BetaHat'] = atomic_to_json(trial.beta_hat)
     to_return['BetaVar'] = atomic_to_json(trial.beta_var)
 
+    to_return['ProbTox'] = iterable_to_json(trial.prob_tox())
     for i, dl in enumerate(trial.dose_levels()):
         to_return['ProbTox{}'.format(dl)] = trial.prob_tox()[i]
 

@@ -21,8 +21,10 @@ What does clintrials do?
 Why Python?
 ----
 No biostatisticians use Python, they use R / Stata / SAS, so why is this in Python?
-Well, Python is used **extensively** in most other sciences and I think it is pitifully underused in clinical trials.
-This sad state of affairs arises because i) universities teach statistics with R / Stata / SAS and ii) humans are lazy lumps with a propensity for 'one size fits all' thinking. Once they learn enough R / Stata / SAS, they give up learning new tricks.
+Well, Python is used **extensively** in most other sciences and I think it is sadly underused in clinical trials.
+It is nice to program in Python. 
+The same cannot be said for your typical stats language, in my opinion.
+Python also offers a truck-load of extras and thr parallel capabilities of IPython are having a big impact on my work.
 
 Python is object-orientated, which is important when you are writing a bunch of classes that do a similar job in fundamentally different ways, like clinical trial designs, say.
 

@@ -27,7 +27,7 @@ from clintrials.dosefinding.wagestait import wt_get_theta_hat
 
 
 class WATU(EfficacyToxicityDoseFindingTrial):
-    """ Brock & Yap's fusion of Wages & Tait adaptive phase I/II design with Thall & Cook's EffTox utility contours.
+    """ Brock & Yap's fusion of Wages & Tait's phase I/II design with Thall & Cook's EffTox utility contours.
 
     See Wages, N.A. & Tait, C. - Seamless Phase I/II Adaptive Design For Oncology Trials
                     of Molecularly Targeted Agents, to appear in Journal of Biopharmaceutical Statistics
@@ -179,6 +179,12 @@ class WATU(EfficacyToxicityDoseFindingTrial):
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
         cases = zip(self._doses, self._toxicities, self._efficacies)
+        toxicity_cases = []
+        for (dose, tox, eff) in cases:
+            toxicity_cases.append((dose, tox))
+        self.crm.reset()
+        self.crm.update(toxicity_cases)
+
         # Update parameters for efficacy estimates
         integrals = wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
                                      use_quick_integration=self.use_quick_integration, estimate_var=True)
@@ -213,14 +219,6 @@ class WATU(EfficacyToxicityDoseFindingTrial):
         self.theta_hats = np.zeros(self.K)
         self.theta_vars = np.zeros(self.K)
         self.crm.reset()
-
-    def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        # Update CRM toxicity model
-        toxicity_cases = []
-        for (dose, tox, eff) in cases:
-            toxicity_cases.append((dose, tox))
-        self.crm.update(toxicity_cases)
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)

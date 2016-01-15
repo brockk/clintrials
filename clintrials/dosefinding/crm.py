@@ -235,7 +235,9 @@ class CRM(DoseFindingTrial):
                  beta_prior=norm(0, np.sqrt(1.34)), method="bayes", use_quick_integration=False, estimate_var=True,
                  avoid_skipping_untried_escalation=False, avoid_skipping_untried_deescalation=False,
                  lowest_dose_too_toxic_hurdle=0.0, lowest_dose_too_toxic_certainty=0.0,
-                 coherency_threshold=0.0, termination_func=None):
+                 coherency_threshold=0.0,
+                 principle_escalation_func=None,
+                 termination_func=None):
         """
 
         Params:
@@ -263,9 +265,18 @@ class CRM(DoseFindingTrial):
                                     at a dose exceeds this value. For instance, you might not want to escalate if the
                                     observed toxicity rate exceeds the target rate, because that would be 'incoherent'
                                     to the objectives of the trial.
-        :param termination_func: a function that takes this trial instance as a sole parameter and returns True if
-                trial should terminate, else False. The function is invoked when trial is asked whether it has more.
-                This function gives trials a general facility to terminate early if certain conditions are met.
+        :param principle_escalation_func: an optional function that takes cases (i.e., a list of
+                            (1-based dose-level, boolean DLT dummies) like [(1,0), (2,0), (3,1)] )
+                and returns either a) the next dose to br given, or b) None, to signify that principle escalation does
+                not apply and that the general CRM method should be used.
+                This function lets users specify their desired escalation that will take priority over the CRM strategy.
+                For example, some users like to specify an initial escalation strategy that escalates until it
+                observes the first toxicity. This function allows that behaviour in a flexible way.
+                The principle_escalation_func is checked at every update so, if you use it, be mindful that it yields
+                to the CRM model when you want it to by returning None.
+        :param termination_func: an optional function that takes this trial instance as a sole parameter and returns
+                True if trial should terminate, else False. The function is invoked when trial is asked whether it has
+                more. This function gives trials a general facility to terminate early if certain conditions are met.
 
         Note: this class makes no attempt (yet) to tackle the problem Ken Cheung describes of 'incoherent
         escalation', where the design escalates after observing a toxicity. When the cohort size is 1,
@@ -291,21 +302,25 @@ class CRM(DoseFindingTrial):
         self.lowest_dose_too_toxic_hurdle = lowest_dose_too_toxic_hurdle
         self.lowest_dose_too_toxic_certainty = lowest_dose_too_toxic_certainty
         self.coherency_threshold = coherency_threshold
+        self.principle_escalation_func = principle_escalation_func
         self.termination_func = termination_func
         if lowest_dose_too_toxic_hurdle and lowest_dose_too_toxic_certainty:
             if not self.estimate_var:
                 logging.warn('To monitor toxicity at lowest dose, I had to enable beta variance estimation.')
             self.estimate_var = True
         # Reset
-        self.beta_hat, self.beta_var = None, None
+        self.beta_hat, self.beta_var = beta_prior.mean(), beta_prior.var()
 
     def _DoseFindingTrial__reset(self):
-        self.beta_hat, self.beta_var = None, None
-
-    def _DoseFindingTrial__process_cases(self, cases):
-        return
+        self.beta_hat, self.beta_var = self.beta_prior.mean(), self.beta_prior.var()
 
     def _DoseFindingTrial__calculate_next_dose(self):
+
+        if self.principle_escalation_func:
+            cases = zip(self._doses, self._toxicities)
+            proposed_dose = self.principle_escalation_func(cases)
+            if proposed_dose is not None:
+                return proposed_dose
 
         current_dose = self.next_dose()
         max_dose_given = self.maximum_dose_given()
@@ -487,11 +502,14 @@ def crm_dtp_detail(trial):
 
     to_return = OrderedDict()
 
-    to_return['BetaHat'] = atomic_to_json(trial.beta_hat)
-    to_return['BetaVar'] = atomic_to_json(trial.beta_var)
+    if trial.beta_hat is not None:
+        to_return['BetaHat'] = atomic_to_json(trial.beta_hat)
+    if trial.beta_var is not None:
+        to_return['BetaVar'] = atomic_to_json(trial.beta_var)
 
-    to_return['ProbTox'] = iterable_to_json(trial.prob_tox())
-    for i, dl in enumerate(trial.dose_levels()):
-        to_return['ProbTox{}'.format(dl)] = trial.prob_tox()[i]
+    if trial.prob_tox() is not None:
+        to_return['ProbTox'] = iterable_to_json(trial.prob_tox())
+        for i, dl in enumerate(trial.dose_levels()):
+            to_return['ProbTox{}'.format(dl)] = trial.prob_tox()[i]
 
     return to_return

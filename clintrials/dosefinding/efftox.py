@@ -634,10 +634,6 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         self._admissable_set = []
         self.utility = []
 
-    def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        return
-
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
 
@@ -976,90 +972,6 @@ def classify_eff_class(prob_eff, eff_cutoff, text_label=True):
 def get_eff_class(eff_curve, eff_cutoff):
     prob_eff = eff_curve
     return classify_eff_class(prob_eff, eff_cutoff)
-
-
-# def _patient_outcome_to_label(po):
-#     """ Converts (0,0) to Neither; (1,0) to Toxicity, (0,1) to Efficacy, (1,1) to Both """
-#     if po == (0,0):
-#         return 'Neither'
-#     elif po == (1,0):
-#         return 'Toxicity'
-#     elif po == (0,1):
-#         return 'Efficacy'
-#     elif po == (1,1):
-#         return 'Both'
-#     else:
-#         return 'Error'
-
-# Moved to __init__
-# def efftox_dose_transition_pathways(trial, next_dose, cohort_sizes, cohort_number=1, cases_already_observed=[],
-#                                     custom_output_func=None, verbose=False, **kwargs):
-#     """ Calculate dose-transition pathways for an efficacy-toxicity design.
-#
-#     :param trial: subclass of EfficacyToxicityDoseFindingTrial that will determine the dose path
-#     :type trial: clintrials.dosefinding.EfficacyToxicityDoseFindingTrial
-#     :param next_dose: the dose that will be given to patients in the very next cohort to get things going.
-#     :type next_dose: int
-#     :param cohort_sizes: list of ints, sizes of future cohorts that we want to calculate DTPs for.
-#                             E.g. use [3,2] to calculate DTPs for two subsequent cohorts, the first of
-#                             three patients followed by another cohort of two.
-#     :type cohort_size: list
-#     :param cohort_number: The decorative cohort number label for the first cohort
-#     :type cohort_number: int
-#     :param cases_already_observed: list of (dose, tox=0/1, eff=0/1) cases that have already been observed
-#     :type cases_already_observed: list
-#     :param custom_output_func: func that takes trial as sole argument and returns dict of extra output.
-#                                 Called at end of each cohort, i.e. at each dose decision.
-#     :type custom_output_func: func
-#     :param verbose: True to print extra information to monitor progress
-#     :type verbose: bool
-#     :param kwargs: extra keyword args to send to trial.update method
-#     :type kwargs: dict
-#
-#     :return: DTPs as JSON-able dict object. Paths are nested.
-#     :rtype: dict
-#
-#     """
-#
-#     if len(cohort_sizes) <= 0:
-#         return None
-#     else:
-#         cohort_size = cohort_sizes[0]
-#         patient_outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
-#         cohort_outcomes = list(combinations_with_replacement(patient_outcomes, cohort_size))
-#         path_outputs = []
-#         for i, path in enumerate(cohort_outcomes):
-#             # Invoke dose-decision
-#             cohort_cases = [(next_dose, x[0], x[1]) for x in path]
-#             cases = cases_already_observed + cohort_cases
-#             if verbose:
-#                 print 'Running', cases
-#             trial.reset()
-#             obd = trial.update(cases, **kwargs)
-#             # Collect output
-#             bag_o_tricks = OrderedDict([('Pat{}.{}'.format(cohort_number, j+1), _patient_outcome_to_label(po))
-#                                         for (j, po) in enumerate(path)])
-#             bag_o_tricks.update(OrderedDict([
-#                         ('DoseGiven', atomic_to_json(next_dose)),
-#                         ('RecommendedDose', atomic_to_json(obd)),
-#                         ('CohortSize', cohort_size),
-#                         ('NumEff', sum([x[1] for x in path])),
-#                         ('NumTox', sum([x[0] for x in path])),
-#                     ]))
-#             if custom_output_func:
-#                 bag_o_tricks.update(custom_output_func(trial))
-#
-#             # Recurse subsequent cohorts
-#             further_paths = efftox_dose_transition_pathways(trial, next_dose=obd, cohort_sizes=cohort_sizes[1:],
-#                                                             cohort_number=cohort_number+1, cases_already_observed=cases,
-#                                                             custom_output_func=custom_output_func, verbose=verbose,
-#                                                             **kwargs)
-#             if further_paths:
-#                 bag_o_tricks['Next'] = further_paths
-#
-#             path_outputs.append(bag_o_tricks)
-#
-#         return path_outputs
 
 
 def efftox_dtp_detail(trial):

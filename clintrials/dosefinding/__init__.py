@@ -7,6 +7,7 @@ __all__ = ["crm", "efftox", "wagestait", "watu"]
 
 import abc
 from collections import OrderedDict
+import copy
 from itertools import product, combinations_with_replacement
 import logging
 import numpy as np
@@ -44,7 +45,6 @@ class DoseFindingTrial(object):
 
     Further internal interface is provided by:
     __reset()
-    __process_cases(cases)
     __calculate_next_dose() # Subclasses should override this method, set _status and return value for _next_dose.
 
     Class uses the internal variable _status to signify the current status of the trial. At the start of each
@@ -183,7 +183,6 @@ class DoseFindingTrial(object):
             self._doses.append(dose)
             self._toxicities.append(tox)
 
-        self.__process_cases(cases)
         self._next_dose = self.__calculate_next_dose()
         return self._next_dose
 
@@ -279,11 +278,6 @@ class DoseFindingTrial(object):
         return (self.size() < self.max_size()) and (self._status >= 0)
 
     @abc.abstractmethod
-    def __process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        return  # Default implementation
-
-    @abc.abstractmethod
     def __calculate_next_dose(self):
         """ Subclasses should override this method and return the desired next dose. """
         return -1  # Default implementation
@@ -326,9 +320,6 @@ class SimpleToxicityCountingDoseEscalationTrial(DoseFindingTrial):
     def _DoseFindingTrial__reset(self):
         self.max_dose_given = -1
 
-    def _DoseFindingTrial__process_cases(self, cases):
-        return
-
     def _DoseFindingTrial__calculate_next_dose(self):
         if self.has_more():
             self._status = 1
@@ -345,132 +336,132 @@ class SimpleToxicityCountingDoseEscalationTrial(DoseFindingTrial):
                and self.maximum_dose_given() < self.number_of_doses()
 
 
-class MultiStageDoseFindingTrial(DoseFindingTrial):
-    """ Sequentially conduct dose-finding trials, with the first feeding into the second if desired.
-
-    e.g. trivial example that hopefully illustrates usage of transition_mode='informs'
-    >>> stage_1 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=10, max_toxicities=1)
-    >>> stage_2 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=10, max_toxicities=2)
-    >>> trial = MultiStageDoseFindingTrial(first_dose=1, num_doses=5, max_size=6+18, first_design=stage_1,
-    ...                                    second_design=stage_2, transition_mode='informs')
-    >>> trial.current_trial_cursor
-    0
-    >>> trial.update([(1,0), (2,0), (3,0), (3,1)])
-    3
-    >>> trial.has_more()
-    True
-    >>> trial.dose_finding_trials[0].size()
-    4
-    >>> trial.dose_finding_trials[1].size()
-    0
-    >>> trial.current_trial_cursor
-    1
-    >>> trial.next_dose()
-    3
-    >>> trial.update([(3,0), (3,0), (3,1)])
-    4
-    >>> trial.update([(3,0), (4,0), (4,1), (4,1)])
-    4
-    >>> trial.has_more()
-    False
-    >>> trial.next_dose()
-    4
-
-    and now an example to illustrate
-    >>> stage_1 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=6, max_toxicities=1)
-    >>> stage_2 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=18, max_toxicities=2)
-    >>> trial2 = MultiStageDoseFindingTrial(first_dose=1, num_doses=5, max_size=6+18, first_design=stage_1,
-    ...                                     second_design=stage_2, transition_mode='feeds')
-    >>> trial2.current_trial_cursor
-    0
-    >>> trial2.update([(1,0), (2,1)])
-    3
-    >>> trial2.current_trial_cursor
-    1
-    >>> trial2.dose_finding_trials[0].size()
-    2
-    >>> trial2.dose_finding_trials[1].size()
-    2
-    >>> trial2.has_more()
-    True
-    >>> trial2.update([(3,1)])
-    3
-    >>> trial2.has_more()
-    False
-    >>> trial2.next_dose()
-    3
-
-    """
-
-    def __init__(self, first_dose, num_doses, max_size, first_design, second_design, transition_mode='feeds'):
-        """
-        Params:
-        transition_mode, one of:
-            feeds, for all observed dose and toxicity data from first design to be fed into second design at transition
-            informs, for second design to start at the MTD determined by the first design
-        """
-
-        DoseFindingTrial.__init__(self, first_dose=first_dose, num_doses=num_doses, max_size=max_size)
-
-        self.dose_finding_trials = [first_design, second_design]
-        self.transition_mode = transition_mode
-        # Reset
-        self.current_trial_cursor = 0  # Index of trial design currently being used to provide doses
-
-    def _DoseFindingTrial__reset(self):
-        self.current_trial_cursor = 0
-        for design in self.dose_finding_trials:
-            design.reset()
-
-    def _DoseFindingTrial__process_cases(self, cases):
-        if self.current_trial_cursor < len(self.dose_finding_trials):
-            current_design = self.dose_finding_trials[self.current_trial_cursor]
-            _next_dose = current_design.update(cases)
-            if not current_design.has_more():
-                self.current_trial_cursor += 1
-                if self.current_trial_cursor < len(self.dose_finding_trials):
-                    previous_design = current_design
-                    current_design = self.dose_finding_trials[self.current_trial_cursor]
-                    if self.transition_mode == 'feeds':
-                        observed_cases = [(x, y) for (x, y) in
-                                          zip(previous_design.doses(), previous_design.toxicities())]
-                        current_design.set_next_dose(_next_dose)
-                        _next_dose = current_design.update(observed_cases)
-                    elif self.transition_mode == 'informs':
-                        current_design.set_next_dose(_next_dose)
-                    else:
-                        raise ValueError('Invalid transition mode: ', self.transition_mode)
-            return
-        else:
-            if len(self.dose_finding_trials) > 0:
-                logging.error('There is no dose-finding design to update. All designs are exhausted.')
-            return
-
-    def _DoseFindingTrial__calculate_next_dose(self):
-        if self.current_trial_cursor < len(self.dose_finding_trials):
-            current_design = self.dose_finding_trials[self.current_trial_cursor]
-            self._status = current_design.status()
-            return current_design.next_dose()
-        elif len(self.dose_finding_trials) > 0:
-            last_design = self.dose_finding_trials[-1]
-            self._status = last_design.status()
-            return last_design.next_dose()
-        else:
-            self._status = -10
-            return -1
-
-    def has_more(self):
-        if self.current_trial_cursor < len(self.dose_finding_trials):
-            current_design = self.dose_finding_trials[self.current_trial_cursor]
-            if current_design.has_more():
-                return DoseFindingTrial.has_more(self)
-            elif self.current_trial_cursor+1 < len(self.dose_finding_trials):
-                next_design = self.dose_finding_trials[self.current_trial_cursor+1]
-                if next_design.has_more():
-                    return DoseFindingTrial.has_more(self)
-
-        # Got here? There is no more
-        return False
+# class MultiStageDoseFindingTrial(DoseFindingTrial):
+#     """ Sequentially conduct dose-finding trials, with the first feeding into the second if desired.
+#
+#     e.g. trivial example that hopefully illustrates usage of transition_mode='informs'
+#     >>> stage_1 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=10, max_toxicities=1)
+#     >>> stage_2 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=10, max_toxicities=2)
+#     >>> trial = MultiStageDoseFindingTrial(first_dose=1, num_doses=5, max_size=6+18, first_design=stage_1,
+#     ...                                    second_design=stage_2, transition_mode='informs')
+#     >>> trial.current_trial_cursor
+#     0
+#     >>> trial.update([(1,0), (2,0), (3,0), (3,1)])
+#     3
+#     >>> trial.has_more()
+#     True
+#     >>> trial.dose_finding_trials[0].size()
+#     4
+#     >>> trial.dose_finding_trials[1].size()
+#     0
+#     >>> trial.current_trial_cursor
+#     1
+#     >>> trial.next_dose()
+#     3
+#     >>> trial.update([(3,0), (3,0), (3,1)])
+#     4
+#     >>> trial.update([(3,0), (4,0), (4,1), (4,1)])
+#     4
+#     >>> trial.has_more()
+#     False
+#     >>> trial.next_dose()
+#     4
+#
+#     and now an example to illustrate
+#     >>> stage_1 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=6, max_toxicities=1)
+#     >>> stage_2 = SimpleToxicityCountingDoseEscalationTrial(first_dose=1, num_doses=5, max_size=18, max_toxicities=2)
+#     >>> trial2 = MultiStageDoseFindingTrial(first_dose=1, num_doses=5, max_size=6+18, first_design=stage_1,
+#     ...                                     second_design=stage_2, transition_mode='feeds')
+#     >>> trial2.current_trial_cursor
+#     0
+#     >>> trial2.update([(1,0), (2,1)])
+#     3
+#     >>> trial2.current_trial_cursor
+#     1
+#     >>> trial2.dose_finding_trials[0].size()
+#     2
+#     >>> trial2.dose_finding_trials[1].size()
+#     2
+#     >>> trial2.has_more()
+#     True
+#     >>> trial2.update([(3,1)])
+#     3
+#     >>> trial2.has_more()
+#     False
+#     >>> trial2.next_dose()
+#     3
+#
+#     """
+#
+#     def __init__(self, first_dose, num_doses, max_size, first_design, second_design, transition_mode='feeds'):
+#         """
+#         Params:
+#         transition_mode, one of:
+#             feeds, for all observed dose and toxicity data from first design to be fed into second design at transition
+#             informs, for second design to start at the MTD determined by the first design
+#         """
+#
+#         DoseFindingTrial.__init__(self, first_dose=first_dose, num_doses=num_doses, max_size=max_size)
+#
+#         self.dose_finding_trials = [first_design, second_design]
+#         self.transition_mode = transition_mode
+#         # Reset
+#         self.current_trial_cursor = 0  # Index of trial design currently being used to provide doses
+#
+#     def _DoseFindingTrial__reset(self):
+#         self.current_trial_cursor = 0
+#         for design in self.dose_finding_trials:
+#             design.reset()
+#
+#     def _DoseFindingTrial__process_cases(self, cases):
+#         if self.current_trial_cursor < len(self.dose_finding_trials):
+#             current_design = self.dose_finding_trials[self.current_trial_cursor]
+#             _next_dose = current_design.update(cases)
+#             if not current_design.has_more():
+#                 self.current_trial_cursor += 1
+#                 if self.current_trial_cursor < len(self.dose_finding_trials):
+#                     previous_design = current_design
+#                     current_design = self.dose_finding_trials[self.current_trial_cursor]
+#                     if self.transition_mode == 'feeds':
+#                         observed_cases = [(x, y) for (x, y) in
+#                                           zip(previous_design.doses(), previous_design.toxicities())]
+#                         current_design.set_next_dose(_next_dose)
+#                         _next_dose = current_design.update(observed_cases)
+#                     elif self.transition_mode == 'informs':
+#                         current_design.set_next_dose(_next_dose)
+#                     else:
+#                         raise ValueError('Invalid transition mode: ', self.transition_mode)
+#             return
+#         else:
+#             if len(self.dose_finding_trials) > 0:
+#                 logging.error('There is no dose-finding design to update. All designs are exhausted.')
+#             return
+#
+#     def _DoseFindingTrial__calculate_next_dose(self):
+#         if self.current_trial_cursor < len(self.dose_finding_trials):
+#             current_design = self.dose_finding_trials[self.current_trial_cursor]
+#             self._status = current_design.status()
+#             return current_design.next_dose()
+#         elif len(self.dose_finding_trials) > 0:
+#             last_design = self.dose_finding_trials[-1]
+#             self._status = last_design.status()
+#             return last_design.next_dose()
+#         else:
+#             self._status = -10
+#             return -1
+#
+#     def has_more(self):
+#         if self.current_trial_cursor < len(self.dose_finding_trials):
+#             current_design = self.dose_finding_trials[self.current_trial_cursor]
+#             if current_design.has_more():
+#                 return DoseFindingTrial.has_more(self)
+#             elif self.current_trial_cursor+1 < len(self.dose_finding_trials):
+#                 next_design = self.dose_finding_trials[self.current_trial_cursor+1]
+#                 if next_design.has_more():
+#                     return DoseFindingTrial.has_more(self)
+#
+#         # Got here? There is no more
+#         return False
 
 
 class ThreePlusThree(DoseFindingTrial):
@@ -532,9 +523,6 @@ class ThreePlusThree(DoseFindingTrial):
 
     def _DoseFindingTrial__reset(self):
         self._continue = True
-
-    def _DoseFindingTrial__process_cases(self, cases):
-        return
 
     def _DoseFindingTrial__calculate_next_dose(self):
         dose_indices = np.array(self._doses) == self._next_dose
@@ -893,7 +881,6 @@ class EfficacyToxicityDoseFindingTrial(object):
     
     Further internal interface is provided by:
     __reset()
-    __process_cases(cases)
     __calculate_next_dose() # Subclasses should override, set _status & _admissable_set, and return _next_dose.
 
     Class uses the internal variable _status to signify the current status of the trial. At the start of each
@@ -1041,7 +1028,6 @@ class EfficacyToxicityDoseFindingTrial(object):
                 self._toxicities.append(tox)
                 self._efficacies.append(eff)
 
-            self.__process_cases(cases)
             self._next_dose = self.__calculate_next_dose(**kwargs)
         else:
             logging.warn('Cannot update design with no cases')
@@ -1108,98 +1094,93 @@ class EfficacyToxicityDoseFindingTrial(object):
         return (self.size() < self.max_size()) and (self._status >= 0)
 
     @abc.abstractmethod
-    def __process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        return  # Default implementation
-
-    @abc.abstractmethod
     def __calculate_next_dose(self, **kwargs):
         """ Subclasses should override this method and return the desired next dose. """
         return -1  # Default implementation
 
 
-def dose_transition_pathways_to_pandas(trial, first_cohort_number, last_cohort_number, cohort_size,
-                                       cases_already_observed=None, next_dose=None, to_pandas_dataframe=True,
-                                       **kwargs):
-    """ Calculate the dose-transition pathways of a DoseFindingTrial.
-
-    :param trial: a dose-finding trial design, an instance of some subclass of DoseFindingTrial
-    :type trial: DoseFindingTrial
-    :param first_cohort_number: cohort pathways starting with this cohort
-    :type first_cohort_number: int
-    :param last_cohort_number: cohort pathways to this cohort, inclusive
-    :type last_cohort_number: int
-    :param cohort_size: number of patients per cohort
-    :type cohort_size: int
-    :param cases_already_observed: list of 2-tuples representing cases already observed, in format
-                                    (dose, toxicity), where dose is the given (1-based) dose level
-                                    and toxicity = 1 for a toxicity event; 0 for a tolerance event.
-    :type cases_already_observed: list
-    :param next_dose: the dose that will be given to the first cohort.
-                      If None and cases_already_observed is non-empty, next_dose is calculated by the trial instance,
-                          after being updated with the observed cases.
-                      If None and cases_already_observed is empty, the trial's first dose is used.
-    :type next_dose: int
-
-    :param to_pandas_dataframe: True to get a pandas DataFrame back; False to get list of tuples
-    :type to_pandas_dataframe: bool
-    :param kwargs: extra kwargs for calls to trial.update
-    :type kwargs: dict
-    :return: collection of dose-transition pathways
-    :rtype: pandas.DataFrame or list
-
-    """
-
-    def _path_and_dose_recommendations_to_row(path, doses):
-        if len(doses) > 0:
-            row = [doses[0]]
-            for num_tox, dose in zip(path, doses[1:]):
-                row.append(num_tox)
-                row.append(dose)
-        else:
-            row = []
-        return row
-
-    def _get_col_names(first_cohort_number, last_cohort_number, cohort_size):
-        cohort_ids = range(first_cohort_number, last_cohort_number+1)
-        cols = ['Dose_0']
-        for i in cohort_ids:
-            cols.append('Tox_{}'.format(i))
-            cols.append('Dose_{}'.format(i))
-        return cols
-
-    num_cohort_toxicities = range(cohort_size+1)
-    trial_outcomes = list(product(num_cohort_toxicities, repeat=1+last_cohort_number-first_cohort_number))
-
-    if cases_already_observed is None:
-        cases_already_observed = []
-
-    out = []
-    for path in trial_outcomes:
-        trial.reset()
-        trial.update(cases_already_observed, **kwargs)
-        if next_dose is not None:
-            dose = next_dose
-        elif len(cases_already_observed) > 0:
-            dose = trial.next_dose()
-        else:
-            dose = trial.first_dose()
-        doses = [dose]
-
-        for num_toxs in path:
-            cohort_cases = [(dose, 1)] * num_toxs + [(dose, 0)] * (cohort_size - num_toxs)
-            dose = trial.update(cohort_cases, **kwargs)
-            doses.append(dose)
-
-        out.append(_path_and_dose_recommendations_to_row(path, doses))
-
-    if to_pandas_dataframe:
-        import pandas as pd
-        out_pd = pd.DataFrame(out)
-        out_pd.columns = _get_col_names(first_cohort_number, last_cohort_number, cohort_size)
-        return out_pd
-    else:
-        return out
+# def dose_transition_pathways_to_pandas(trial, first_cohort_number, last_cohort_number, cohort_size,
+#                                        cases_already_observed=None, next_dose=None, to_pandas_dataframe=True,
+#                                        **kwargs):
+#     """ Calculate the dose-transition pathways of a DoseFindingTrial.
+#
+#     :param trial: a dose-finding trial design, an instance of some subclass of DoseFindingTrial
+#     :type trial: DoseFindingTrial
+#     :param first_cohort_number: cohort pathways starting with this cohort
+#     :type first_cohort_number: int
+#     :param last_cohort_number: cohort pathways to this cohort, inclusive
+#     :type last_cohort_number: int
+#     :param cohort_size: number of patients per cohort
+#     :type cohort_size: int
+#     :param cases_already_observed: list of 2-tuples representing cases already observed, in format
+#                                     (dose, toxicity), where dose is the given (1-based) dose level
+#                                     and toxicity = 1 for a toxicity event; 0 for a tolerance event.
+#     :type cases_already_observed: list
+#     :param next_dose: the dose that will be given to the first cohort.
+#                       If None and cases_already_observed is non-empty, next_dose is calculated by the trial instance,
+#                           after being updated with the observed cases.
+#                       If None and cases_already_observed is empty, the trial's first dose is used.
+#     :type next_dose: int
+#
+#     :param to_pandas_dataframe: True to get a pandas DataFrame back; False to get list of tuples
+#     :type to_pandas_dataframe: bool
+#     :param kwargs: extra kwargs for calls to trial.update
+#     :type kwargs: dict
+#     :return: collection of dose-transition pathways
+#     :rtype: pandas.DataFrame or list
+#
+#     """
+#
+#     def _path_and_dose_recommendations_to_row(path, doses):
+#         if len(doses) > 0:
+#             row = [doses[0]]
+#             for num_tox, dose in zip(path, doses[1:]):
+#                 row.append(num_tox)
+#                 row.append(dose)
+#         else:
+#             row = []
+#         return row
+#
+#     def _get_col_names(first_cohort_number, last_cohort_number, cohort_size):
+#         cohort_ids = range(first_cohort_number, last_cohort_number+1)
+#         cols = ['Dose_0']
+#         for i in cohort_ids:
+#             cols.append('Tox_{}'.format(i))
+#             cols.append('Dose_{}'.format(i))
+#         return cols
+#
+#     num_cohort_toxicities = range(cohort_size+1)
+#     trial_outcomes = list(product(num_cohort_toxicities, repeat=1+last_cohort_number-first_cohort_number))
+#
+#     if cases_already_observed is None:
+#         cases_already_observed = []
+#
+#     out = []
+#     for path in trial_outcomes:
+#         trial.reset()
+#         trial.update(cases_already_observed, **kwargs)
+#         if next_dose is not None:
+#             dose = next_dose
+#         elif len(cases_already_observed) > 0:
+#             dose = trial.next_dose()
+#         else:
+#             dose = trial.first_dose()
+#         doses = [dose]
+#
+#         for num_toxs in path:
+#             cohort_cases = [(dose, 1)] * num_toxs + [(dose, 0)] * (cohort_size - num_toxs)
+#             dose = trial.update(cohort_cases, **kwargs)
+#             doses.append(dose)
+#
+#         out.append(_path_and_dose_recommendations_to_row(path, doses))
+#
+#     if to_pandas_dataframe:
+#         import pandas as pd
+#         out_pd = pd.DataFrame(out)
+#         out_pd.columns = _get_col_names(first_cohort_number, last_cohort_number, cohort_size)
+#         return out_pd
+#     else:
+#         return out
 
 
 def dose_transition_pathways_to_json(trial, next_dose, cohort_sizes, cohort_number=1, cases_already_observed=[],
@@ -1282,124 +1263,55 @@ def dose_transition_pathways_to_json(trial, next_dose, cohort_sizes, cohort_numb
             path_outputs.append(bag_o_tricks)
 
         return path_outputs
-
-
 dose_transition_pathways = dose_transition_pathways_to_json
 
 
-# I have improved upon this cluster of functions
-# def _patient_outcome_to_label(po):
-#     """ Converts (0,0) to Neither; (1,0) to Toxicity, etc"""
-#     if po == (0,0):
-#         return 'Neither'
-#     elif po == (1,0):
-#         return 'Toxicity'
-#     elif po == (0,1):
-#         return 'Efficacy'
-#     elif po == (1,1):
-#         return 'Both'
-#     else:
-#         return 'Error'
-# def efficacy_toxicity_dose_transition_pathways(trial, first_cohort_number, last_cohort_number, cohort_size,
-#                                                cases_already_observed, next_dose=None, to_pandas_dataframe=True,
-#                                                verbose=False, use_labels=False, log_every=10, **kwargs):
-#     """ Calculate dose-transition pathways for an efficacy-toxicity dose-finding design.
-#
-#     :param trial: instance of a subclass of EfficacyToxicityDoseFindingTrial that will determine the dose path
-#     :type trial: clintrials.dosefinding.EfficacyToxicityDoseFindingTrial
-#     :param first_cohort_number: int, calculate DTPs from this cohort to the end, inclusive
-#     :type first_cohort_number: int
-#     :param last_cohort_number: int, calculate DTPs from this start to this cohort, inclusive
-#     :type last_cohort_number: int
-#     :param cohort_size: number of patients per cohort
-#     :type cohort_size: int
-#     :param cases_already_observed: list of (dose, tox=0/1, eff=0/1) cases that have already been observed
-#     :type cases_already_observed: list
-#     :param next_dose: the dose that will be given to the first cohort.
-#                       If None and cases_already_observed is non-empty, next_dose is calculated by the trial instance,
-#                           after being updated with the observed cases.
-#                       If None and cases_already_observed is empty, the trial's first dose is used.
-#     :type next_dose: int
-#     :param to_pandas_dataframe: True to get a pandas DataFrame returned with meaningful col headers.
-#                                 False to get a list of lists.
-#     :type to_pandas_dataframe: bool
-#     :param verbose: True to print extra information to monitor progress
-#     :type verbose: bool
-#     :param use_labels: True to use labels like 'Both', 'Toxicity', etc in place of (1,1) and (1,0)
-#     :type use_labels: bool
-#     :param log_every: if verbose, log a progress message after every nth iteration
-#     :type log_every: int
-#     :param kwargs: extra keyword args to send to trial.update method
-#     :type kwargs: dict
-#
-#     :return: pandas DataFrame if to_pandas_dataframe else list of lists
-#     :rtype: pandas.DataFrame
-#
-#     """
-#
-#     def _path_and_dose_recommendations_to_row(path, doses):
-#         if len(doses) > 0:
-#             row = [doses[0]]
-#             for coh, dose in zip(path, doses[1:]):
-#                 for p in coh:
-#                     if use_labels:
-#                         row.append(_patient_outcome_to_label(p))
-#                     else:
-#                         row.append(p[0])
-#                         row.append(p[1])
-#                 row.append(dose)
-#         else:
-#             row = []
-#         return row
-#
-#     def _get_col_names(first_cohort_number, last_cohort_number, cohort_size):
-#         cohort_ids = range(first_cohort_number, last_cohort_number+1)
-#         cols = ['Dose{}'.format(first_cohort_number-1)]
-#         for i in cohort_ids:
-#             for j in range(1, cohort_size+1):
-#                 if use_labels:
-#                     cols.append('Pat{}.{}'.format(i, j))
-#                 else:
-#                     cols.append('Tox{}.{}'.format(i, j))
-#                     cols.append('Eff{}.{}'.format(i, j))
-#             cols.append('Dose{}'.format(i))
-#         return cols
-#
-#     patient_outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
-#     cohort_outcomes = list(combinations_with_replacement(patient_outcomes, cohort_size))
-#     trial_outcomes = list(product(cohort_outcomes, repeat=1+last_cohort_number-first_cohort_number))
-#
-#     out = []
-#     for i, path in enumerate(trial_outcomes):
-#         trial.reset()
-#         if cases_already_observed:
-#             trial.update(cases_already_observed, **kwargs)
-#
-#         if next_dose is not None:
-#             dose = next_dose
-#         elif len(cases_already_observed) > 0:
-#             dose = trial.next_dose()
-#         else:
-#             dose = trial.first_dose()
-#         doses = [dose]
-#
-#         for cohort_path in path:
-#             cohort_cases = [(dose, x[0], x[1]) for x in cohort_path]
-#             dose = trial.update(cohort_cases, **kwargs)
-#             doses.append(dose)
-#
-#         out.append(_path_and_dose_recommendations_to_row(path, doses))
-#
-#         if verbose and i > 0 and i % log_every == 0:
-#             print datetime.now(), '- completed {} iterations'.format(i)
-#
-#     if to_pandas_dataframe:
-#         import pandas as pd
-#         out_pd = pd.DataFrame(out)
-#         out_pd.columns = _get_col_names(first_cohort_number, last_cohort_number, cohort_size)
-#         return out_pd
-#     else:
-#         return out
+def print_dtps(dtps, indent=0, dose_label_func=None):
+    if dose_label_func is None:
+        dose_label_func = lambda x: str(x)
+    for x in dtps:
+        num_tox = x['NumTox']
+        mtd = x['RecommendedDose']
+
+        template_txt = '\t' * indent + '{} -> Dose {}'
+        print template_txt.format(num_tox, dose_label_func(mtd))
+
+        if 'Next' in x:
+            print_dtps(x['Next'], indent=indent+1, dose_label_func=dose_label_func)
+
+
+def _dtps_to_rows(dtps, dose_label_func=None, pre=[]):
+    if dose_label_func is None:
+        dose_label_func = lambda x: x
+    rows = []
+    for x in dtps:
+        this_row = copy.copy(pre)
+        num_tox = x['NumTox']
+        mtd = dose_label_func(x['RecommendedDose'])
+        this_row.extend([num_tox, mtd])
+
+        if 'Next' in x:
+            news_rows = _dtps_to_rows(x['Next'], dose_label_func=dose_label_func, pre=this_row)
+            rows.extend(news_rows)
+        else:
+            rows.append(this_row)
+    return rows
+
+
+def dtps_to_pandas(dtps, dose_label_func=None):
+    import pandas as pd
+    if dose_label_func is None:
+        dose_label_func = lambda x: str(x)
+    rows = _dtps_to_rows(dtps, dose_label_func=dose_label_func)
+    df = pd.DataFrame(rows)
+    ncols = df.shape[1]
+    cols = []
+    for i in range(1, 1+ncols/2):
+        cols.extend(['Cohort {} DLTs'.format(i), 'Cohort {} Dose'.format(i+1)])
+    df.columns = cols
+
+    return df
+
 
 def _efftox_patient_outcome_to_label(po):
     """ Converts (0,0) to Neither; (1,0) to Toxicity, (0,1) to Efficacy, (1,1) to Both """

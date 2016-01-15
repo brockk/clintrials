@@ -264,6 +264,12 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
         cases = zip(self._doses, self._toxicities, self._efficacies)
+        toxicity_cases = []
+        for (dose, tox, eff) in cases:
+            toxicity_cases.append((dose, tox))
+        self.crm.reset()
+        self.crm.update(toxicity_cases)
+
         # Update parameters for efficacy estimates
         integrals = wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
                                      use_quick_integration=self.use_quick_integration, estimate_var=False)
@@ -309,14 +315,6 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         if self.randomise_at_start:
             self._next_dose = self._randomise_next_dose(self.prior_tox_probs,
                                                         self.skeletons[self.most_likely_model_index])
-
-    def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        # Update CRM toxicity model
-        toxicity_cases = []
-        for (dose, tox, eff) in cases:
-            toxicity_cases.append((dose, tox))
-        self.crm.update(toxicity_cases)
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)

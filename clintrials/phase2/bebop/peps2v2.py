@@ -2,34 +2,47 @@ __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
 
-""" Second attempt at classes and functions for the PePs2 trial.
+""" Probability models for the BeBOP model used in PePS2 trial.
 
-    PePS2 studies the efficacy and toxicity of a drug in a population
-    of performance status 2 lung cancer patients. Patient outcomes
-    may plausibly be effected by whether or not they have been
-    treated before, and the expression rate of PD-L1 in their cells.
+In PePS2, the patient vector is x and D is a list of x instances, where:
 
-    Our all-comers trial uses Brock et al's BeBOP design to incorporate
-    this potentially predictive data to find the sub population(s)
-    where the drug works and is tolerable.
+x[0] is efficacy event
+x[1] is toxicity event
+x[2] is pre-treated group membership dummy
+x[3] is low PD-L1 group membership dummy
+x[4] is middle PD-L1 group membership dummy
 
-    This script is version 2 and aims to de-couple the general design
-    from the predictive variable chosen. It will not succeed completely,
-    but will hopefully be a step in the right direction.
+The parameter vector is theta:
+theta[0] is efficacy model intercept
+theta[1] is efficacy model pre-treated group coeff
+theta[2] is efficacy model low PD-L1 group coeff
+theta[3] is efficacy model middle PD-L1 group coeff
+theta[4] is toxicity model intercept
+theta[5] is association param
 
-    """
+"""
 
-from collections import OrderedDict
-import datetime
-import glob
-from itertools import product
-import json
-import logging
-import numpy as np
-import pandas as pd
-
-from clintrials.stats import chi_squ_test, or_test, ProbabilityDensitySample
-from clintrials.util import correlated_binary_outcomes, atomic_to_json, iterable_to_json
+import numpy
 
 
-# TODO
+def pi_e(x, theta):
+    z = theta[:,0] + theta[:, 1]*x[2] + theta[:, 2]*x[3] + theta[:, 3]*x[4]
+    return 1/(1+numpy.exp(-z))
+
+
+def pi_t(x, theta):
+    z = theta[:,4]
+    return 1 / (1+numpy.exp(-z))
+
+
+def pi_ab(x, theta):
+    b = x[0] # had efficacy
+    a = x[1] # had_toxicity
+    psi = theta[:, 5]
+    pe = pi_e(x, theta)
+    pt = pi_t(x, theta)
+    joint_prob = pe**b * (1-pe)**(1-b) * pt**a * (1-pt)**(1-a)
+    joint_prob = joint_prob + (-1)**(a+b) * pe * (1-pe) * pt * (1-pt) * (numpy.exp(psi) - 1) / (numpy.exp(psi) + 1)
+    return joint_prob
+
+

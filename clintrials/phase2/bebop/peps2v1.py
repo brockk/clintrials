@@ -2,7 +2,23 @@ __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
 
-""" Classes and functions for the PePs2 trial """
+""" First attempt at classes and functions for the PePs2 trial.
+
+    PePS2 studies the efficacy and toxicity of a drug in a population
+    of performance status 2 lung cancer patients. Patient outcomes
+    may plausibly be effected by whether or not they have been
+    treated before, and the expression rate of PD-L1 in their cells.
+
+    Our all-comers trial uses Brock et al's BeBOP design to incorporate
+    this potentially predictive data to find the sub population(s)
+    where the drug works and is tolerable.
+
+    This script is version 1 because it is frightfully highly coupled
+    with the predictive variables chosen. For example, we initially
+    treated PD-L1 as two groups, high and low. When I came to change
+    this to high / medium and low, I had trouble.
+
+    """
 
 from collections import OrderedDict
 import datetime
@@ -13,7 +29,6 @@ import logging
 import numpy as np
 import pandas as pd
 
-from clintrials.phase2 import Phase2EffToxBase
 from clintrials.stats import chi_squ_test, or_test, ProbabilityDensitySample
 from clintrials.util import correlated_binary_outcomes, atomic_to_json, iterable_to_json
 
@@ -109,7 +124,7 @@ def get_posterior_probs(D, priors, tox_cutoffs, eff_cutoffs, n=10**5):
     return probs, pds
 
 
-class PePS2BeBOP(Phase2EffToxBase):
+class PePS2BeBOP():
 
     def __init__(self, theta_priors, tox_cutoffs, eff_cutoffs, tox_certainty, eff_certainty):
         """
@@ -145,6 +160,21 @@ class PePS2BeBOP(Phase2EffToxBase):
         self.prob_eff = []
         self.prob_acc_tox = []
         self.prob_acc_eff = []
+
+    def size(self):
+        return len(self.cases)
+
+    def pretreated_statuses(self):
+        return [case[0] for case in self.cases]
+
+    def mutation_statuses(self):
+        return [case[1] for case in self.cases]
+
+    def efficacies(self):
+        return [case[2] for case in self.cases]
+
+    def toxicities(self):
+        return [case[3] for case in self.cases]
 
     def update(self, cases, n=10**6, **kwargs):
         for disease_status, mutation_status, eff, tox in cases:
@@ -227,113 +257,113 @@ class PePS2BeBOP(Phase2EffToxBase):
         return 0
 
 
-class PePs2BryantAndDayStage(Phase2EffToxBase):
-
-    def __init__(self, min_efficacy_events, max_tox_events, effects_mode='ChiSqu'):
-
-        """ A stage in a Bryant & Day trial accepts a treatment by comparing number of efficacy and tox
-        events to some critical (optimal) thresholds.
-
-        I have bolted on ways of testing treatment effects. The method of testing treatment effects is
-        governed by effects_mode:
-        - 'ChiSqu' to measure association by chi-squared tests;
-        - 'Logit' to measure effects using joint logit GLM
-
-        """
-
-        self.min_efficacy_events = min_efficacy_events
-        self.max_tox_events = max_tox_events
-        self.effects_mode = effects_mode
-        self.reset()
-
-    def reset(self):
-        self.cases = []
-        self.num_eff = 0
-        self.num_tox = 0
-
-    def update(self, cases):
-        for disease_status, mutation_status, tox, eff in cases:
-            self.cases.append((disease_status, mutation_status, tox, eff))
-
-        self.num_eff = sum(self.efficacies())
-        self.num_tox = sum(self.toxicities())
-
-
-    def decision(self, i):
-        """ Get the trial-outcome decision in group i.
-
-        True means approve treatment.
-
-        """
-
-        return self.num_eff >= self.min_efficacy_events and self.num_tox <= self.max_tox_events
-
-    def efficacy_effect(self, j, alpha=0.05):
-        """ Get confidence interval and mean estimate of the effect on efficacy, expressed as odds-ratios.
-
-        Use:
-        - j=0, to get treatment effect of the intercept variable
-        - j=1, to get treatment effect of the pre-treated status variable
-        - j=2, to get treatment effect of the mutation status variable
-
-        """
-
-        if self.effects_mode == 'ChiSqu':
-            return self._response_effect_by_chisqu(j, alpha)
-        elif self.effects_mode == 'Logit':
-            return self._response_effect_by_logit(j, alpha)
-        else:
-            return [0,0,0]
-
-    def toxicity_effect(self, j=0, alpha=0.05):
-        """ Get confidence interval and mean estimate of the effect on toxicity, expressed as odds-ratios.
-
-        Use:
-        - j=0, to get effect on toxicity of the intercept variable
-
-        """
-
-        # These could be added by running the appropriate tests. But they're not required yet.
-        return (0,0,0)
-
-    def correlation_effect(self, alpha=0.05):
-        """ Get confidence interval and mean estimate of the correlation between efficacy and toxicity. """
-        # TODO: Confidence interval for correlation is described here
-        # http://ncss.wpengine.netdna-cdn.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Interval_for_Pearsons_Correlation.pdf
-        return [-1, np.corrcoef(self.toxicities(), self.efficacies())[0,1], 1]
-
-    def _response_effect_by_chisqu(self, j, alpha):
-        if j==0:
-            return [0,0,0]
-        elif j==1:
-            test = chi_squ_test(self.pretreated_statuses(), self.efficacies(), ci_alpha=alpha)
-            ci = test['Odds']['OR CI']
-            return [ci[0], test['Odds']['OR'], ci[1]]
-        elif j==2:
-            test = chi_squ_test(self.mutation_statuses(), self.efficacies(), ci_alpha=alpha)
-            ci = test['Odds']['OR CI']
-            return [ci[0], test['Odds']['OR'], ci[1]]
-        else:
-            return (0,0,0)
-
-    def _response_effect_by_logit(self, j, alpha):
-        import statsmodels.api as sm
-        if j==0:
-            return [0,0,0]
-        elif j==1:
-            eff_logit_model = sm.Logit(self.efficacies(), pd.DataFrame({'PreTreated': self.pretreated_statuses(),
-                                                                        'Mutation': self.mutation_statuses()}))
-            eff_logit_model_result = eff_logit_model.fit(disp=0)
-            ci = eff_logit_model_result.conf_int(alpha=alpha).loc['PreTreated'].values
-            return np.exp([ci[0], eff_logit_model_result.params['PreTreated'], ci[1]])
-        elif j==2:
-            eff_logit_model = sm.Logit(self.efficacies(), pd.DataFrame({'PreTreated': self.pretreated_statuses(),
-                                                                        'Mutation': self.mutation_statuses()}))
-            eff_logit_model_result = eff_logit_model.fit(disp=0)
-            ci = eff_logit_model_result.conf_int(alpha=alpha).loc['Mutation'].values
-            return np.exp([ci[0], eff_logit_model_result.params['Mutation'], ci[1]])
-        else:
-            return [0,0,0]
+# class PePs2BryantAndDayStage(Phase2EffToxBase):
+#
+#     def __init__(self, min_efficacy_events, max_tox_events, effects_mode='ChiSqu'):
+#
+#         """ A stage in a Bryant & Day trial accepts a treatment by comparing number of efficacy and tox
+#         events to some critical (optimal) thresholds.
+#
+#         I have bolted on ways of testing treatment effects. The method of testing treatment effects is
+#         governed by effects_mode:
+#         - 'ChiSqu' to measure association by chi-squared tests;
+#         - 'Logit' to measure effects using joint logit GLM
+#
+#         """
+#
+#         self.min_efficacy_events = min_efficacy_events
+#         self.max_tox_events = max_tox_events
+#         self.effects_mode = effects_mode
+#         self.reset()
+#
+#     def reset(self):
+#         self.cases = []
+#         self.num_eff = 0
+#         self.num_tox = 0
+#
+#     def update(self, cases):
+#         for disease_status, mutation_status, tox, eff in cases:
+#             self.cases.append((disease_status, mutation_status, tox, eff))
+#
+#         self.num_eff = sum(self.efficacies())
+#         self.num_tox = sum(self.toxicities())
+#
+#
+#     def decision(self, i):
+#         """ Get the trial-outcome decision in group i.
+#
+#         True means approve treatment.
+#
+#         """
+#
+#         return self.num_eff >= self.min_efficacy_events and self.num_tox <= self.max_tox_events
+#
+#     def efficacy_effect(self, j, alpha=0.05):
+#         """ Get confidence interval and mean estimate of the effect on efficacy, expressed as odds-ratios.
+#
+#         Use:
+#         - j=0, to get treatment effect of the intercept variable
+#         - j=1, to get treatment effect of the pre-treated status variable
+#         - j=2, to get treatment effect of the mutation status variable
+#
+#         """
+#
+#         if self.effects_mode == 'ChiSqu':
+#             return self._response_effect_by_chisqu(j, alpha)
+#         elif self.effects_mode == 'Logit':
+#             return self._response_effect_by_logit(j, alpha)
+#         else:
+#             return [0,0,0]
+#
+#     def toxicity_effect(self, j=0, alpha=0.05):
+#         """ Get confidence interval and mean estimate of the effect on toxicity, expressed as odds-ratios.
+#
+#         Use:
+#         - j=0, to get effect on toxicity of the intercept variable
+#
+#         """
+#
+#         # These could be added by running the appropriate tests. But they're not required yet.
+#         return (0,0,0)
+#
+#     def correlation_effect(self, alpha=0.05):
+#         """ Get confidence interval and mean estimate of the correlation between efficacy and toxicity. """
+#         # TODO: Confidence interval for correlation is described here
+#         # http://ncss.wpengine.netdna-cdn.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Interval_for_Pearsons_Correlation.pdf
+#         return [-1, np.corrcoef(self.toxicities(), self.efficacies())[0,1], 1]
+#
+#     def _response_effect_by_chisqu(self, j, alpha):
+#         if j==0:
+#             return [0,0,0]
+#         elif j==1:
+#             test = chi_squ_test(self.pretreated_statuses(), self.efficacies(), ci_alpha=alpha)
+#             ci = test['Odds']['OR CI']
+#             return [ci[0], test['Odds']['OR'], ci[1]]
+#         elif j==2:
+#             test = chi_squ_test(self.mutation_statuses(), self.efficacies(), ci_alpha=alpha)
+#             ci = test['Odds']['OR CI']
+#             return [ci[0], test['Odds']['OR'], ci[1]]
+#         else:
+#             return (0,0,0)
+#
+#     def _response_effect_by_logit(self, j, alpha):
+#         import statsmodels.api as sm
+#         if j==0:
+#             return [0,0,0]
+#         elif j==1:
+#             eff_logit_model = sm.Logit(self.efficacies(), pd.DataFrame({'PreTreated': self.pretreated_statuses(),
+#                                                                         'Mutation': self.mutation_statuses()}))
+#             eff_logit_model_result = eff_logit_model.fit(disp=0)
+#             ci = eff_logit_model_result.conf_int(alpha=alpha).loc['PreTreated'].values
+#             return np.exp([ci[0], eff_logit_model_result.params['PreTreated'], ci[1]])
+#         elif j==2:
+#             eff_logit_model = sm.Logit(self.efficacies(), pd.DataFrame({'PreTreated': self.pretreated_statuses(),
+#                                                                         'Mutation': self.mutation_statuses()}))
+#             eff_logit_model_result = eff_logit_model.fit(disp=0)
+#             ci = eff_logit_model_result.conf_int(alpha=alpha).loc['Mutation'].values
+#             return np.exp([ci[0], eff_logit_model_result.params['Mutation'], ci[1]])
+#         else:
+#             # return [0,0,0]
 
 
 def simulate_peps2_patients(num_patients, prob_pretreated, prob_mutated, params):

@@ -118,29 +118,39 @@ class BeBOP():
         self._pds = ProbabilityDensitySample(samp, lik_integrand)
         return
 
-    def _predict_case(self, case, eff_cutoff, tox_cutoff, pds, samp):
+    def _predict_case(self, case, eff_cutoff, tox_cutoff, pds, samp, estimate_ci=False):
         x = case
         eff_probs = self._pi_e(x, samp)
         tox_probs = self._pi_t(x, samp)
         from collections import OrderedDict
-        return OrderedDict([
+        predictions = OrderedDict([
             ('Pr(Eff)', pds.expectation(eff_probs)),
             ('Pr(Tox)', pds.expectation(tox_probs)),
             ('Pr(AccEff)', pds.expectation((eff_probs > eff_cutoff))),
             ('Pr(AccTox)', pds.expectation((tox_probs < tox_cutoff))),
         ])
 
-    def predict(self, cases, eff_cutoff, tox_cutoff, to_pandas=False):
+        if estimate_ci:
+            predictions['Pr(Eff) Lower'] = pds.quantile_vector(eff_probs, 0.05, start_value=0.05)
+            predictions['Pr(Eff) Upper'] = pds.quantile_vector(eff_probs, 0.95, start_value=0.95)
+            predictions['Pr(Tox) Lower'] = pds.quantile_vector(tox_probs, 0.05, start_value=0.05)
+            predictions['Pr(Tox) Upper'] = pds.quantile_vector(tox_probs, 0.95, start_value=0.95)
+        return predictions
+
+    def predict(self, cases, eff_cutoff, tox_cutoff, to_pandas=False, estimate_ci=False):
         if self._pds is not None:
             pds = self._pds
             samp = pds._samp
-            fitted = [self._predict_case(x, eff_cutoff, tox_cutoff, pds, samp) for x in cases]
+            fitted = [self._predict_case(x, eff_cutoff, tox_cutoff, pds, samp, estimate_ci=estimate_ci) for x in cases]
             if to_pandas:
-                return pd.DataFrame(fitted, columns=['Pr(Eff)', 'Pr(Tox)', 'Pr(AccEff)', 'Pr(AccTox)'])
+                if estimate_ci:
+                    return pd.DataFrame(fitted, columns=['Pr(Eff)', 'Pr(Tox)', 'Pr(AccEff)', 'Pr(AccTox)',
+                                                         'Pr(Eff) Lower', 'Pr(Eff) Upper', 'Pr(Tox) Lower', 'Pr(Tox) Upper'])
+                else:
+                    return pd.DataFrame(fitted, columns=['Pr(Eff)', 'Pr(Tox)', 'Pr(AccEff)', 'Pr(AccTox)'])
             else:
                 return fitted
         else:
-            print 'no'
             return None
 
     def get_posterior_param_means(self):

@@ -1,6 +1,7 @@
 __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
+from collections import OrderedDict
 import logging
 import numpy as np
 from scipy.stats import norm
@@ -9,6 +10,7 @@ from scipy.optimize import minimize
 
 from clintrials.dosefinding import DoseFindingTrial
 from clintrials.common import empiric, logistic, inverse_empiric, inverse_logistic
+from clintrials.util import atomic_to_json, iterable_to_json
 
 
 def toxicity_likelihood(link_func, a0, beta, dose, tox, log=False):
@@ -232,29 +234,49 @@ class CRM(DoseFindingTrial):
     def __init__(self, prior, target, first_dose, max_size, F_func=empiric, inverse_F=inverse_empiric,
                  beta_prior=norm(0, np.sqrt(1.34)), method="bayes", use_quick_integration=False, estimate_var=True,
                  avoid_skipping_untried_escalation=False, avoid_skipping_untried_deescalation=False,
-                 lowest_dose_too_toxic_hurdle=0.0, lowest_dose_too_toxic_certainty=0.0, termination_func=None):
+                 lowest_dose_too_toxic_hurdle=0.0, lowest_dose_too_toxic_certainty=0.0,
+                 coherency_threshold=0.0,
+                 principle_escalation_func=None,
+                 termination_func=None):
         """
 
         Params:
-        prior, list of prior probabilities of toxicity, from least toxic to most.
-        target, target toxicity rate
-        first_dose, starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
-        F_func and inverse_F, the link function and inverse for CRM method, e.g. logistic and inverse_logistic
-        beta_prior, prior distibution for beta parameter
-        max_size, maximum number of patients to use in trial
-        method, one of "bayes" or "mle"
-        use_quick_integration, numerical integration is slow. Set this to False to use the most accurate (slowest)
+        :param prior: list of prior probabilities of toxicity, from least toxic to most.
+        :param target: target toxicity rate
+        :param first_dose: starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
+        :param F_func: the link function for CRM method, e.g. logistic
+        :param inverse_F: the inverse link function for CRM method, e.g. inverse_logistic
+        :param beta_prior: prior distibution for beta parameter
+        :param max_size: maximum number of patients to use in trial
+        :param method: one of "bayes" or "mle"
+        :param use_quick_integration: numerical integration is slow. Set this to False to use the most accurate (& slow)
                                 method; False to use a quick but approximate method.
                                 In simulations, fast and approximate often suffices.
                                 In trial scenarios, use slow and accurate!
-        estimate_var, True to estimate the posterior variance of beta
-        avoid_skipping_untried_escalation, True to avoid skipping untried doses in escalation
-        avoid_skipping_untried_deescalation, True to avoid skipping untried doses in de-escalation
-        lowest_dose_too_toxic_hurdle,
-        lowest_dose_too_toxic_certainty,
-        termination_func, a function that takes this trial instance as a sole parameter and returns True if trial should
-         terminate, else False. The function is invoked when trial is asked whether it has more.
-         This function gives trials a general facility to terminate early if certain specified conditions are met.
+        :param estimate_var: True to estimate the posterior variance of beta
+        :param avoid_skipping_untried_escalation: True to avoid skipping untried doses in escalation
+        :param avoid_skipping_untried_deescalation: True to avoid skipping untried doses in de-escalation
+        :param lowest_dose_too_toxic_hurdle: used with lowest_dose_too_toxic_certainty to facilitate stopping the trial
+                    when the rate of estimated toxicity at the lowest dose is too high. Trial stops if:
+                        Prob( Prob(Tox at d1) > lowest_dose_too_toxic_hurdle | X) > lowest_dose_too_toxic_certainty
+                    Both must be positive for test to be invoked.
+        :param lowest_dose_too_toxic_certainty: see above
+        :param coherency_threshold: if positive, the design is prevented from escalating when the observed toxicity rate
+                                    at a dose exceeds this value. For instance, you might not want to escalate if the
+                                    observed toxicity rate exceeds the target rate, because that would be 'incoherent'
+                                    to the objectives of the trial.
+        :param principle_escalation_func: an optional function that takes cases (i.e., a list of
+                            (1-based dose-level, boolean DLT dummies) like [(1,0), (2,0), (3,1)] )
+                and returns either a) the next dose to br given, or b) None, to signify that principle escalation does
+                not apply and that the general CRM method should be used.
+                This function lets users specify their desired escalation that will take priority over the CRM strategy.
+                For example, some users like to specify an initial escalation strategy that escalates until it
+                observes the first toxicity. This function allows that behaviour in a flexible way.
+                The principle_escalation_func is checked at every update so, if you use it, be mindful that it yields
+                to the CRM model when you want it to by returning None.
+        :param termination_func: an optional function that takes this trial instance as a sole parameter and returns
+                True if trial should terminate, else False. The function is invoked when trial is asked whether it has
+                more. This function gives trials a general facility to terminate early if certain conditions are met.
 
         Note: this class makes no attempt (yet) to tackle the problem Ken Cheung describes of 'incoherent
         escalation', where the design escalates after observing a toxicity. When the cohort size is 1,
@@ -279,21 +301,30 @@ class CRM(DoseFindingTrial):
         self.avoid_skipping_untried_deescalation = avoid_skipping_untried_deescalation
         self.lowest_dose_too_toxic_hurdle = lowest_dose_too_toxic_hurdle
         self.lowest_dose_too_toxic_certainty = lowest_dose_too_toxic_certainty
+        self.coherency_threshold = coherency_threshold
+        self.principle_escalation_func = principle_escalation_func
         self.termination_func = termination_func
         if lowest_dose_too_toxic_hurdle and lowest_dose_too_toxic_certainty:
             if not self.estimate_var:
                 logging.warn('To monitor toxicity at lowest dose, I had to enable beta variance estimation.')
             self.estimate_var = True
         # Reset
-        self.beta_hat, self.beta_var = None, None
+        self.beta_hat, self.beta_var = beta_prior.mean(), beta_prior.var()
 
     def _DoseFindingTrial__reset(self):
-        self.beta_hat, self.beta_var = None, None
-
-    def _DoseFindingTrial__process_cases(self, cases):
-        return
+        self.beta_hat, self.beta_var = self.beta_prior.mean(), self.beta_prior.var()
 
     def _DoseFindingTrial__calculate_next_dose(self):
+
+        if self.principle_escalation_func:
+            cases = zip(self._doses, self._toxicities)
+            proposed_dose = self.principle_escalation_func(cases)
+            if proposed_dose is not None:
+                return proposed_dose
+
+        current_dose = self.next_dose()
+        max_dose_given = self.maximum_dose_given()
+        min_dose_given = self.minimum_dose_given()
         proposed_dose, beta_hat, beta_var = crm(prior=self.prior, target=self.target, toxicities=self._toxicities,
                                                 dose_levels=self._doses, first_dose=self._first_dose,
                                                 F_func=self.F_func, inverse_F=self.inverse_F,
@@ -303,15 +334,7 @@ class CRM(DoseFindingTrial):
         self.beta_hat = beta_hat
         self.beta_var = beta_var
 
-        max_dose_given = self.maximum_dose_given()
-        min_dose_given = self.minimum_dose_given()
-        if self.avoid_skipping_untried_escalation and max_dose_given and proposed_dose - max_dose_given > 1:
-            # Avoid skipping untried doses in escalation by setting proposed dose to max_dose_given + 1
-            proposed_dose = max_dose_given + 1
-        elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - proposed_dose > 1:
-            # Avoid skipping untried doses in de-escalation by setting proposed dose to min_dose_given - 1
-            proposed_dose = min_dose_given - 1
-        # Note: other methods of limiting dose escalation and de-escalation are possible.
+        # print current_dose, max_dose_given, min_dose_given, proposed_dose
 
         # Excess toxicity at lowest dose?
         if self.lowest_dose_too_toxic_hurdle and self.lowest_dose_too_toxic_certainty:
@@ -323,21 +346,31 @@ class CRM(DoseFindingTrial):
             if p0_tox > self.lowest_dose_too_toxic_certainty:
                 proposed_dose = 0
                 self._status = -1
+                return proposed_dose
+
+        # Coherency
+        if self.coherency_threshold and proposed_dose > current_dose:
+            # print 'Testing coherence'
+            tox_rate_at_current = self.observed_toxicity_rates()[current_dose-1]
+            # print 'Tox at current', tox_rate_at_current
+            if not np.isnan(tox_rate_at_current) and tox_rate_at_current > self.coherency_threshold:
+                # Avoid escalation. Stay at current
+                # print 'Throttling for coherence'
+                proposed_dose = current_dose
+                return proposed_dose
+
+        # Skipping doses
+        if self.avoid_skipping_untried_escalation and max_dose_given and proposed_dose - max_dose_given > 1:
+            # Avoid skipping untried doses in escalation by setting proposed dose to max_dose_given + 1
+            proposed_dose = max_dose_given + 1
+            return proposed_dose
+        elif self.avoid_skipping_untried_deescalation and min_dose_given and min_dose_given - proposed_dose > 1:
+            # Avoid skipping untried doses in de-escalation by setting proposed dose to min_dose_given - 1
+            proposed_dose = min_dose_given - 1
+            return proposed_dose
+        # Note: other methods of limiting dose escalation and de-escalation are possible.
 
         return proposed_dose
-
-    # def prob_tox(self, n=10**6):
-    #     if self.estimate_var:
-    #         # Estimate probability of toxicity using plug-in mean and variance for beta, and randomly
-    #         # sampling values from normal. Why normal? Because the prior for is normal and the posterior
-    #         # is asymptotically normal. For low n, non-normality may lead to bias.
-    #         # TODO: research replacing this with a proper posterior integral when in bayes mode.
-    #         labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
-    #         beta_sample = norm(loc=self.beta_hat, scale=np.sqrt(self.beta_var)).rvs(n)
-    #         p0_sample = [self.F_func(label, a0=self.first_dose(), beta=beta_sample) for label in labels]
-    #         return np.array([np.mean(x) for x in p0_sample])
-    #     else:
-    #         raise Exception('CRM can only estimate posterior probabilities when estimate_var=True')
 
     def prob_tox(self):
         labels = [self.inverse_F(p, a0=self.first_dose(), beta=self.beta_prior.mean()) for p in self.prior]
@@ -458,3 +491,25 @@ class CRM(DoseFindingTrial):
             phi = (np.sqrt(5)+1)/2.
             p.set_size_inches(12, 12/phi)
             # return p
+
+
+def crm_dtp_detail(trial):
+    """ Performs the CRM-specific extra reporting when calculating DTPs
+    :param trial: instance of CRM
+    :return: OrderedDict
+
+    """
+
+    to_return = OrderedDict()
+
+    if trial.beta_hat is not None:
+        to_return['BetaHat'] = atomic_to_json(trial.beta_hat)
+    if trial.beta_var is not None:
+        to_return['BetaVar'] = atomic_to_json(trial.beta_var)
+
+    if trial.prob_tox() is not None:
+        to_return['ProbTox'] = iterable_to_json(trial.prob_tox())
+        for i, dl in enumerate(trial.dose_levels()):
+            to_return['ProbTox{}'.format(dl)] = trial.prob_tox()[i]
+
+    return to_return

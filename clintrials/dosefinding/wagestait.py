@@ -4,14 +4,13 @@ __contact__ = 'kristian.brock@gmail.com'
 """ An implementation of Wages & Tait's adaptive Bayesian design for dose-finding in clinical trials.
 
 See:
-Wages, N.A. and Tait, C. (2014?). Seamless Phase I/II Adaptive Design For Oncology Trials of Molecularly Targeted Agents,
+Wages, N.A. and Tait, C. (2015). Seamless Phase I/II Adaptive Design For Oncology Trials of Molecularly Targeted Agents,
         Journal of Biopharmiceutical Statistics (preprint)
 
 """
 
 
 import numpy as np
-# import pandas as pd
 from scipy.stats import norm, beta
 from scipy.integrate import quad, trapz
 from random import sample
@@ -195,7 +194,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         self.beta_prior = beta_prior
         self.excess_toxicity_alpha = excess_toxicity_alpha
         self.deficient_efficacy_alpha = deficient_efficacy_alpha
-        if model_prior_weights:
+        if model_prior_weights is not None:
             if self.K != len(model_prior_weights):
                 ValueError('model_prior_weights should have %s items.' % self.K)
             if sum(model_prior_weights) == 0:
@@ -228,7 +227,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
 
         Params:
         dose-level, 1-based index of dose level
-        alpha, significance level, i.e. alpha% of probabilities will be less than response
+        alpha, significance level, i.e. 100*alpha% of probabilities will be lower than the returned value
 
         Returns: a probability
 
@@ -237,8 +236,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
             n = self.treated_at_dose(dose_level)
             x = self.toxicities_at_dose(dose_level)
             if n > 0:
-                ci = beta(x, n-x+1).ppf(alpha/2), beta(x+1, n-x).ppf(1-alpha/2)
-                return ci[0]
+                return beta(x, n-x+1).ppf(alpha)
         # Default
         return np.NaN
 
@@ -247,7 +245,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
 
         Params:
         dose-level, 1-based index of dose level
-        alpha, significance level, i.e. alpha% of probabilities will be greater than response
+        alpha, significance level, i.e. 100*alpha% of probabilities will be greater than the returned value
 
         Returns: a probability
 
@@ -256,8 +254,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
             n = self.treated_at_dose(dose_level)
             x = self.efficacies_at_dose(dose_level)
             if n > 0:
-                ci = beta(x, n-x+1).ppf(alpha/2), beta(x+1, n-x).ppf(1-alpha/2)
-                return ci[1]
+                return beta(x+1, n-x).ppf(1-alpha)
         # Default
         return np.NaN
 
@@ -267,6 +264,12 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
         cases = zip(self._doses, self._toxicities, self._efficacies)
+        toxicity_cases = []
+        for (dose, tox, eff) in cases:
+            toxicity_cases.append((dose, tox))
+        self.crm.reset()
+        self.crm.update(toxicity_cases)
+
         # Update parameters for efficacy estimates
         integrals = wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
                                      use_quick_integration=self.use_quick_integration, estimate_var=False)
@@ -312,14 +315,6 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         if self.randomise_at_start:
             self._next_dose = self._randomise_next_dose(self.prior_tox_probs,
                                                         self.skeletons[self.most_likely_model_index])
-
-    def _EfficacyToxicityDoseFindingTrial__process_cases(self, cases):
-        """ Subclasses should override this method to perform an cases-specific processing. """
-        # Update CRM toxicity model
-        toxicity_cases = []
-        for (dose, tox, eff) in cases:
-            toxicity_cases.append((dose, tox))
-        self.crm.update(toxicity_cases)
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)

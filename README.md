@@ -3,22 +3,27 @@
 ## README ##
 
 clintrials is a library of clinical trial designs and methods in Python.
+This library is intended to facilitate research.
+It is provided "as-is" and the author accepts absolutely no responsibility whatsoever for the correctness or integrity of the calculations.
 
 
 ### What does clintrials do? ###
 
-* This library performs the calculations necessary to run clinical trials.
-* It has working implementations of O'Quigley et al's CRM design, Thall & Cook's EffTox design, and Wages & Tait's efficacy+toxicity design.
-* There is also an implementation of my very own BeBoP trial design for the simultaneous study of bivariate binary outcomes (like efficacy and toxicity) in the presence of predictive variables, both continuous and binary.
-* There is a bias towards phase I and II trial designs because that is my PhD research area.
-* I expect to add more phase II and III designs in the future.
-* It is written in pure Python, intentionally. This library would be quicker if it was written in C++ or Java but it would not be anywhere near as user friendly or accessible.
+* This library implements the designs commonly (and less-commonly) used in clinical trials.
+* It has implementations of O'Quigley et al's CRM design, Thall & Cook's EffTox design, and Wages & Tait's efficacy+toxicity design.
+* There is also an implementation of my very own BeBOP trial design for the simultaneous study of bivariate binary outcomes (like efficacy and toxicity) in the presence of predictive variables, both continuous and binary.
+* There is a bias towards phase I and II trial designs because that is my research area.
+* I expect to add more designs in the future.
+* It is written in pure Python, intentionally. This library would be quicker if it was written in C++ or Java but it would not be as portable or readable.
 * Some of the code is fairly mature but the repo itself is young and in flux.
 
-### Why Python?
+Why Python?
+----
 No biostatisticians use Python, they use R / Stata / SAS, so why is this in Python?
-Well, Python is used **extensively** in most other sciences and I think it is pitifully underused in clinical trials.
-This sad state of affairs arises because i) universities teach statistics with R / Stata / SAS and ii) humans are lazy lumps with a propensity for 'one size fits all' thinking. Once they learn enough R / Stata / SAS, they give up learning new tricks.
+Well, Python is used **extensively** in most other sciences and I think it is sadly underused in clinical trials.
+It is nice to program in Python. 
+The same cannot be said for your typical stats language, in my opinion.
+Python also offers a shed-load of extras and the parallel capabilities of IPython are having a big impact on my work.
 
 Python is object-orientated, which is important when you are writing a bunch of classes that do a similar job in fundamentally different ways, like clinical trial designs, say.
 

@@ -9,6 +9,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde, chi2, norm
+from scipy.optimize import fsolve
 
 
 def bootstrap(x):
@@ -179,6 +180,14 @@ class ProbabilityDensitySample:
         """ Get the cumulative density of the parameter in position i that is less than y. """
         return self.expectation(self._samp[:,i]<y)
 
-    def quantile(self, i, p):
+    def quantile(self, i, p, start_value=0.1):
         """ Get the value of the parameter at position i for which p of the probability mass is in the left-tail. """
-        return fsolve(lambda z: self.cdf(i, z) - p, 0.1)[0]
+        return fsolve(lambda z: self.cdf(i, z) - p, start_value)[0]
+
+    def cdf_vector(self, vector, y):
+        """ Get the cumulative density of sample vector that is less than y. """
+        return self.expectation(vector < y)
+
+    def quantile_vector(self, vector, p, start_value=0.1):
+        """ Get the value of a vector for which p of the probability mass is in the left-tail. """
+        return fsolve(lambda z: self.cdf_vector(vector, z) - p, start_value)[0]

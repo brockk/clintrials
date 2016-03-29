@@ -148,7 +148,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
                  first_dose, max_size, randomisation_stage_size,
                  F_func=empiric, inverse_F=inverse_empiric,
                  theta_prior=norm(0, np.sqrt(1.34)), beta_prior=norm(0, np.sqrt(1.34)),
-                 excess_toxicity_alpha=0.05, deficient_efficacy_alpha=0.05,
+                 excess_toxicity_alpha=0.025, deficient_efficacy_alpha=0.025,
                  model_prior_weights=None, use_quick_integration=False, estimate_var=False):
         """
 
@@ -222,7 +222,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         self.post_eff_probs = np.zeros(self.I)
         self.theta_hats = np.zeros(self.K)
 
-    def dose_toxicity_lower_bound(self, dose_level, alpha=0.05):
+    def dose_toxicity_lower_bound(self, dose_level, alpha=0.025):
         """ Get lower bound of toxicity probability at a dose-level using the Clopper-Pearson aka Beta aka exact method.
 
         Params:
@@ -240,7 +240,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         # Default
         return np.NaN
 
-    def dose_efficacy_upper_bound(self, dose_level, alpha=0.05):
+    def dose_efficacy_upper_bound(self, dose_level, alpha=0.025):
         """ Get upper bound of efficacy probability at a dose-level using the Clopper-Pearson aka Beta aka exact method.
 
         Params:

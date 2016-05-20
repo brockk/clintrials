@@ -16,7 +16,7 @@ from scipy.integrate import quad, trapz
 from random import sample
 
 from clintrials.common import empiric, inverse_empiric
-from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
+from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
 from clintrials.util import correlated_binary_outcomes_from_uniforms
 from crm import CRM
 

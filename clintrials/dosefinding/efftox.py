@@ -17,7 +17,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from clintrials.common import inverse_logit
-from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
+from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
 from clintrials.stats import ProbabilityDensitySample
 from clintrials.util import atomic_to_json, iterable_to_json
 
@@ -636,6 +636,31 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
+
+    def tabulate(self):
+        # import pandas as pd
+        # tab_data = OrderedDict()
+        # treated_at_dose = [self.treated_at_dose(d) for d in self.dose_levels()]
+        # eff_at_dose = [self.efficacies_at_dose(d) for d in self.dose_levels()]
+        # tox_at_dose = [self.toxicities_at_dose(d) for d in self.dose_levels()]
+        # tab_data['Dose'] = self.dose_levels()
+        # tab_data['N'] = treated_at_dose
+        # tab_data['Efficacies'] = eff_at_dose
+        # tab_data['Toxicities'] = tox_at_dose
+        # df = pd.DataFrame(tab_data)
+        # df['EffRate'] = np.where(df.N > 0, df.Efficacies / df.N, np.nan)
+        # df['ToxRate'] = np.where(df.N > 0, df.Toxicities / df.N, np.nan)
+
+        df = EfficacyToxicityDoseFindingTrial.tabulate(self)
+
+        df['P(Eff)'] = self.prob_eff
+        df['P(Tox)'] = self.prob_tox
+        df['P(AccEff)'] = self.prob_acc_eff
+        df['P(AccEff)'] = self.prob_acc_tox
+        df['Admissible'] = self.dose_admissability()
+        df['Utility'] = self.utility
+
+        return df
 
     def posterior_params(self, n=None):
         """ Get posterior parameter estimates """

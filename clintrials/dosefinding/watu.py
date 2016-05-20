@@ -20,8 +20,8 @@ from scipy.stats import norm, beta
 from random import sample
 
 from clintrials.common import empiric, inverse_empiric
-from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
 from clintrials.dosefinding.crm import CRM
+from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
 from clintrials.dosefinding.efftox import solve_metrizable_efftox_scenario
 from clintrials.dosefinding.wagestait import wt_get_theta_hat
 

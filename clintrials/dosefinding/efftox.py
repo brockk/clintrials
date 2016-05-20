@@ -513,19 +513,31 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         Params:
         :param real_doses: list of actual doses. E.g. for 10mg and 25mg, use [10, 25].
+        :type real_doses: list
         :param theta_priors: list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
                                 respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
+        :type theta_priors: list
         :param tox_cutoff: the maximum acceptable probability of toxicity
+        :type tox_cutoff: float
         :param eff_cutoff: the minimium acceptable probability of efficacy
+        :type eff_cutoff: float
         :param tox_certainty: the posterior certainty required that toxicity is less than cutoff
+        :type tox_certainty: float
         :param eff_certainty: the posterior certainty required that efficacy is greater than than cutoff
+        :type eff_certainty: float
         :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
                         of efficacy/toxicity probability pairs.
+        :type metric: LpNormCurve
         :param max_size: maximum number of patients to use
+        :type max_size: int
         :param first_dose: starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        :type first_dose: int
         :param avoid_skipping_untried_escalation: True to avoid skipping untried doses in escalation
+        :type avoid_skipping_untried_escalation: bool
         :param avoid_skipping_untried_deescalation: True to avoid skipping untried doses in de-escalation
+        :type avoid_skipping_untried_deescalation: bool
         :param num_integral_steps: number of points to use in Monte Carlo integration.
+        :type num_integral_steps: int
 
         Note: dose_allocation_mode has been suppressed. Remove once I know it is not needed. KB
         # Instances have a dose_allocation_mode property that is set according to this schedule:

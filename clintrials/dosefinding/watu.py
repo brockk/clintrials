@@ -23,7 +23,7 @@ from clintrials.common import empiric, inverse_empiric
 from clintrials.dosefinding.crm import CRM
 from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
 from clintrials.dosefinding.efftox import solve_metrizable_efftox_scenario
-from clintrials.dosefinding.wagestait import wt_get_theta_hat
+from clintrials.dosefinding.wagestait import _wt_get_theta_hat, _get_post_eff_bayes
 
 
 class WATU(EfficacyToxicityDoseFindingTrial):
@@ -83,37 +83,65 @@ class WATU(EfficacyToxicityDoseFindingTrial):
                  model_prior_weights=None, use_quick_integration=True, estimate_var=True,
                  avoid_skipping_untried_escalation_stage_1=True, avoid_skipping_untried_deescalation_stage_1=True,
                  avoid_skipping_untried_escalation_stage_2=True, avoid_skipping_untried_deescalation_stage_2=True,
-                 must_try_lowest_dose=True # Plumb in
+                 must_try_lowest_dose=True,
+                 plugin_mean=False
                  ):
         """
 
-        :param skeletons: 2-d matrix of skeletons, i.e. list of prior efficacy scenarios, one scenario per row
-        :param prior_tox_probs: list of prior probabilities of toxicity, from least toxic to most
-        :param tox_target: target probability of toxicity in CRM
+        :param skeletons: 2-d matrix of skeletons, i.e. list of lists, one prior efficacy scenario per row
+        :type skeletons: list
+        :param prior_tox_probs: list of prior probabilities of toxicity, from least toxic to most.
+        :type prior_tox_probs: list
+        :param tox_target: target toxicity rate
+        :type tox_target: float
         :param tox_limit: the maximum acceptable probability of toxicity
-        :param eff_limit: the minimum acceptable probability of efficacy
-        :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility of efficacy/toxicity
-                        probability pairs.
-        :param first_dose: starting dose level, 1-based. I.e. first_dose=3 means the middle dose of 5.
-        :param max_size: maximum number of patients to use in trial
+        :type tox_limit: float
+        :param eff_limit: the minimium acceptable probability of efficacy
+        :type eff_limit: float
+        :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
+                        of efficacy/toxicity probability pairs.
+        :type metric: clintrials.dosefinding.efftox.LpNormCurve
+        :param first_dose: starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        :type first_dose: int
+        :param max_size: maximum number of patients to use
+        :type max_size: int
         :param stage_one_size: size of the first stage of the trial, where dose is set by a latent CRM model only,
                         i.e. only toxicity monitoring is performed with no attempt to monitor efficacy. 0 by default
-        :param F_func: the link function for CRM method, e.g. logistic
-        :param inverse_F: the inverse link function for CRM method, e.g. inverse_logistic
+        :type stage_one_size: int
+        :param F_func: the link function for CRM-like methods, e.g. empiric
+        :type F_func: func
+        :param inverse_F: the inverse link function for CRM-like methods method, e.g. inverse_empiric
+        :type inverse_F: func
         :param theta_prior: prior distibution for theta parameter, the single parameter in the efficacy models
+        :type theta_prior: scipy.stats.rv_continuous
         :param beta_prior: prior distibution for beta parameter, the single parameter in the toxicity CRM model
-        :param tox_certainty: significance to use when testing that lowest dose exceeds toxicity limit
-        :param model_prior_weights: vector of prior probabilities that each model is correct. None to use uniform weights
-        :param use_quick_integration: numerical integration is slow. Set this to False to use the most accurate (slowest)
-                                        method; True to use a quick but approximate method.
-                                        In simulations, fast and approximate often suffices.
-                                        In trial scenarios, I use slow and accurate.
-        :param estimate_var: True to estimate the posterior variances of theta and beta
+        :type beta_prior: scipy.stats.rv_continuous
+        :param tox_certainty: the posterior certainty required that toxicity is less than cutoff
+        :type tox_certainty: float
+        :param model_prior_weights: list of prior probabilities that each model is correct. None to use uniform weights
+        :type model_prior_weights: list
+        :param use_quick_integration: numerical integration is slow. Set this to False to use the most accurate (& slow)
+                                method; False to use a quick but approximate method.
+                                In simulations, fast and approximate often suffices.
+                                In trial scenarios, use slow and accurate!
+        :type use_quick_integration: bool
+        :param estimate_var: True to estimate the posterior variance of beta and theta
+        :type estimate_var: bool
         :param avoid_skipping_untried_escalation_stage_1: True to avoid skipping untried doses in escalation in stage 1
-        :param avoid_skipping_untried_deescalation_stage_1: True to avoid skipping untried doses in de-escalation in stage 1
+        :type avoid_skipping_untried_escalation_stage_1: bool
+        :param avoid_skipping_untried_deescalation_stage_1: True to avoid skipping untried doses in de-escalation in
+        stage 1
+        :type avoid_skipping_untried_deescalation_stage_1: bool
         :param avoid_skipping_untried_escalation_stage_2: True to avoid skipping untried doses in escalation in stage 2
-        :param avoid_skipping_untried_deescalation_stage_2: True to avoid skipping untried doses in de-escalation in stage 2
+        :type avoid_skipping_untried_escalation_stage_2: bool
+        :param avoid_skipping_untried_deescalation_stage_2: True to avoid skipping untried doses in de-escalation in
+        stage 2
+        :type avoid_skipping_untried_deescalation_stage_2: bool
         :param must_try_lowest_dose: Unused, TODO
+        :type must_try_lowest_dose: bool
+        :param plugin_mean: True to estimate event curves by plugging parameter estimate into function;
+                            False to estimate using full Bayesian integral (default).
+        :type plugin_mean: bool
 
         """
 
@@ -149,7 +177,8 @@ class WATU(EfficacyToxicityDoseFindingTrial):
         self.avoid_skipping_untried_deescalation_stage_1 = avoid_skipping_untried_deescalation_stage_1
         self.avoid_skipping_untried_escalation_stage_2 = avoid_skipping_untried_escalation_stage_2
         self.avoid_skipping_untried_deescalation_stage_2 = avoid_skipping_untried_deescalation_stage_2
-        self.must_try_lowest_dose = must_try_lowest_dose # TODO: plumb this in
+        self.must_try_lowest_dose = must_try_lowest_dose
+        self.plugin_mean = plugin_mean
 
         # Reset
         self.most_likely_model_index = \
@@ -159,7 +188,8 @@ class WATU(EfficacyToxicityDoseFindingTrial):
                        F_func=empiric, inverse_F=inverse_empiric, beta_prior=beta_prior,
                        use_quick_integration=use_quick_integration, estimate_var=estimate_var,
                        avoid_skipping_untried_escalation=avoid_skipping_untried_escalation_stage_1,
-                       avoid_skipping_untried_deescalation=avoid_skipping_untried_deescalation_stage_1)
+                       avoid_skipping_untried_deescalation=avoid_skipping_untried_deescalation_stage_1,
+                       plugin_mean=plugin_mean)
         self.post_tox_probs = np.zeros(self.I)
         self.post_eff_probs = np.zeros(self.I)
         self.theta_hats = np.zeros(self.K)
@@ -167,7 +197,6 @@ class WATU(EfficacyToxicityDoseFindingTrial):
 
         self.utility = []
         self.dose_allocation_mode = 0
-
 
     def model_theta_hat(self):
         """ Return theta hat for the model with the highest posterior likelihood, i.e. the current model. """
@@ -186,8 +215,8 @@ class WATU(EfficacyToxicityDoseFindingTrial):
         self.crm.update(toxicity_cases)
 
         # Update parameters for efficacy estimates
-        integrals = wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
-                                     use_quick_integration=self.use_quick_integration, estimate_var=True)
+        integrals = _wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
+                                      use_quick_integration=self.use_quick_integration, estimate_var=True)
         theta_hats, theta_vars, model_probs = zip(*integrals)
         self.theta_hats = theta_hats
         self.theta_vars = theta_vars
@@ -195,14 +224,20 @@ class WATU(EfficacyToxicityDoseFindingTrial):
         self.w = w / sum(w)
         most_likely_model_index = np.argmax(w)
         self.most_likely_model_index = most_likely_model_index
-        # TODO: Plug-in means. Better way?
-        self.post_eff_probs = empiric(self.skeletons[most_likely_model_index],
-                                      beta=theta_hats[most_likely_model_index])
-        self.post_tox_probs = empiric(self.prior_tox_probs, beta=self.crm.beta_hat)
+        self.post_tox_probs = np.array(self.crm.prob_tox())
+        if self.plugin_mean:
+            self.post_eff_probs = empiric(self.skeletons[most_likely_model_index],
+                                          beta=theta_hats[most_likely_model_index])
+        else:
+            a0 = 0
+            theta0 = self.theta_prior.mean()
+            dose_labels = [self.inverse_F(p, a0=a0, beta=theta0) for p in self.skeletons[most_likely_model_index]]
+            self.post_eff_probs = _get_post_eff_bayes(cases, self.skeletons[most_likely_model_index], dose_labels,
+                                                      self.theta_prior, use_quick_integration=self.use_quick_integration
+                                                      )
 
         # Update combined model
         if self.size() < self.stage_one_size:
-            # self._next_dose = self._stage_one_next_dose(self.post_tox_probs)
             self._next_dose = self._stage_one_next_dose()
         else:
             self._next_dose = self._stage_two_next_dose(self.post_tox_probs, self.post_eff_probs)
@@ -292,9 +327,14 @@ class WATU(EfficacyToxicityDoseFindingTrial):
                         self._next_dose = dose_level
                         break
             else:
-                # No dose can be selected so stop
-                self._next_dose = -1
-                self._status = -1
+                if self.must_try_lowest_dose and self.treated_at_dose(1) <= 0:
+                    # Lowest dose has not been tried. Try it now rather than stop:
+                    self._next_dose = 1
+                    self._status = 1
+                else:
+                    # No dose can be selected so stop
+                    self._next_dose = -1
+                    self._status = -1
         else:
             # Trial has not yet started
             self._next_dose = self.first_dose()
@@ -323,7 +363,7 @@ class WATU(EfficacyToxicityDoseFindingTrial):
                 dose_level = i+1
                 if dose_level in admissable_set:
                     if (self.avoid_skipping_untried_escalation_stage_2 and max_dose_given
-                        and dose_level - max_dose_given > 1):
+                            and dose_level - max_dose_given > 1):
                         pass  # No skipping in escalation
                     elif (self.avoid_skipping_untried_deescalation_stage_2 and min_dose_given
                           and min_dose_given - dose_level > 1):
@@ -333,9 +373,14 @@ class WATU(EfficacyToxicityDoseFindingTrial):
                         self._next_dose = dose_level
                         break
             else:
-                # No dose can be selected so stop
-                self._next_dose = -1
-                self._status = -1
+                if self.must_try_lowest_dose and self.treated_at_dose(1) <= 0:
+                    # Lowest dose has not been tried. Try it now rather than stop:
+                    self._next_dose = 1
+                    self._status = 1
+                else:
+                    # No dose can be selected so stop
+                    self._next_dose = -1
+                    self._status = -1
         else:
             # Trial has not yet started
             self._next_dose = self.first_dose()

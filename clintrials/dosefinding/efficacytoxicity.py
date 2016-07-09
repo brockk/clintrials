@@ -533,7 +533,7 @@ def dose_transition_pathways(trial, next_dose, cohort_sizes, cohort_number=1, ca
             cohort_cases = [(next_dose, x[0], x[1]) for x in path]
             cases = cases_already_observed + cohort_cases
             if verbose:
-                print 'Running', cases
+                print('Running %s' % cases)
             trial.reset()
             obd = trial.update(cases, **kwargs)
             # Collect output
@@ -587,7 +587,7 @@ def print_dtps(dtps, indent=0, dose_label_func=None):
             template_txt = '\t' * indent + '{} -> Dose {}, Superiority={} * tentative *'
         else:
             template_txt = '\t' * indent + '{} -> Dose {}, Superiority={}'
-        print template_txt.format(path, dose_label_func(obd), np.round(prob_sup, 2))
+        print(template_txt.format(path, dose_label_func(obd), np.round(prob_sup, 2)))
 
         if 'Next' in x:
             print_dtps(x['Next'], indent=indent+1, dose_label_func=dose_label_func)
@@ -604,8 +604,8 @@ def print_dtps_verbose(dtps, indent=0, dose_label_func=None):
         prob_acc_eff = [x['ProbAccEff1'], x['ProbAccEff2'], x['ProbAccEff3'], x['ProbAccEff4']]
         prob_acc_tox = [x['ProbAccTox1'], x['ProbAccTox2'], x['ProbAccTox3'], x['ProbAccTox4']]
         template_txt = '\t' * indent + '{} -> Dose {}, Sup={}, Util={}, Pr(Acc Eff)={}, Pr(Acc Tox)={}'
-        print template_txt.format(path, dose_label_func(obd), np.round(prob_sup, 2), np.round(util, 2),
-                                 np.round(prob_acc_eff, 2), np.round(prob_acc_tox,2))
+        print(template_txt.format(path, dose_label_func(obd), np.round(prob_sup, 2), np.round(util, 2),
+                                 np.round(prob_acc_eff, 2), np.round(prob_acc_tox,2)))
 
         if 'Next' in x:
             print_dtps_verbose(x['Next'], indent=indent+1, dose_label_func=dose_label_func)

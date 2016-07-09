@@ -182,7 +182,7 @@ class WATU(EfficacyToxicityDoseFindingTrial):
 
         # Reset
         self.most_likely_model_index = \
-            sample(np.array(range(self.K))[self.model_prior_weights == max(self.model_prior_weights)], 1)[0]
+            np.random.choice(np.array(range(self.K))[self.model_prior_weights == max(self.model_prior_weights)], 1)[0]
         self.w = np.zeros(self.K)
         self.crm = CRM(prior=prior_tox_probs, target=tox_target, first_dose=first_dose, max_size=max_size,
                        F_func=empiric, inverse_F=inverse_empiric, beta_prior=beta_prior,
@@ -207,7 +207,7 @@ class WATU(EfficacyToxicityDoseFindingTrial):
         return self.theta_vars[self.most_likely_model_index]
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
-        cases = zip(self._doses, self._toxicities, self._efficacies)
+        cases = list(zip(self._doses, self._toxicities, self._efficacies))
         toxicity_cases = []
         for (dose, tox, eff) in cases:
             toxicity_cases.append((dose, tox))

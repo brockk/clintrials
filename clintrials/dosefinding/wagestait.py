@@ -17,8 +17,8 @@ from random import sample
 
 from clintrials.common import empiric, inverse_empiric
 from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
-from clintrials.util import correlated_binary_outcomes_from_uniforms
-from crm import CRM
+#from clintrials.util import correlated_binary_outcomes_from_uniforms
+from clintrials.dosefinding.crm import CRM
 
 
 _min_theta, _max_theta = -10, 10
@@ -280,7 +280,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
 
         # Reset
         self.most_likely_model_index = \
-            sample(np.array(range(self.K))[self.model_prior_weights == max(self.model_prior_weights)], 1)[0]
+            np.random.choice(np.array(range(self.K))[self.model_prior_weights == max(self.model_prior_weights)], 1)[0]
         self.w = np.zeros(self.K)
         if first_dose is None:
             self._next_dose = self._randomise_next_dose(prior_tox_probs, self.skeletons[self.most_likely_model_index])
@@ -336,7 +336,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         return self.theta_hats[self.most_likely_model_index]
 
     def _EfficacyToxicityDoseFindingTrial__calculate_next_dose(self):
-        cases = zip(self._doses, self._toxicities, self._efficacies)
+        cases = list(zip(self._doses, self._toxicities, self._efficacies))
         toxicity_cases = []
         for (dose, tox, eff) in cases:
             toxicity_cases.append((dose, tox))
@@ -347,6 +347,7 @@ class WagesTait(EfficacyToxicityDoseFindingTrial):
         integrals = _wt_get_theta_hat(cases, self.skeletons, self.theta_prior,
                                       use_quick_integration=self.use_quick_integration, estimate_var=False)
         theta_hats, theta_vars, model_probs = zip(*integrals)
+
         self.theta_hats = theta_hats
         w = self.model_prior_weights * model_probs
         self.w = w / sum(w)

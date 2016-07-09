@@ -106,7 +106,7 @@ def test_CRM_bayes_again():
     target = 0.4
     doses = [1,1,1, 2,2,2]
     tox   = [0,0,0, 1,0,1]
-    cases = zip(doses, tox)
+    cases = list(zip(doses, tox))
     trial_plugin_1 = CRM(prior, target, 1, 30, F_func=empiric, inverse_F=inverse_empiric, use_quick_integration=False,
                          plugin_mean=True)
     trial_plugin_2 = CRM(prior, target, 1, 30, F_func=empiric, inverse_F=inverse_empiric, use_quick_integration=True,

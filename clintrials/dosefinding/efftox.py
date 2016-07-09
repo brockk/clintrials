@@ -114,7 +114,7 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     if len(cases) > 0:
         dose_levels, tox_events, eff_events = zip(*cases)
         scaled_doses_given = [scaled_doses[x-1] for x in dose_levels]
-        _cases = zip(scaled_doses_given, tox_events, eff_events)
+        _cases = list(zip(scaled_doses_given, tox_events, eff_events))
     else:
         _cases = []
 
@@ -583,7 +583,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         """
         if n is None:
             n = self.num_integral_steps
-        cases = zip(self._doses, self._toxicities, self._efficacies)
+        cases = list(zip(self._doses, self._toxicities, self._efficacies))
         post_probs, _pds = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                                      self.eff_cutoff, n)
         prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)

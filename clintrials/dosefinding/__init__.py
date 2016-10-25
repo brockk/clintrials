@@ -844,7 +844,7 @@ def dtps_to_pandas(dtps, dose_label_func=None):
     df = pd.DataFrame(rows)
     ncols = df.shape[1]
     cols = []
-    for i in range(1, 1+ncols/2):
+    for i in range(1, 1 + int(ncols / 2)):
         cols.extend(['Cohort {} DLTs'.format(i), 'Cohort {} Dose'.format(i+1)])
     df.columns = cols
 

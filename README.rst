@@ -67,10 +67,15 @@ Using git to clone this repo, including tutorial notebooks
 ----
 
 `mkdir clintrials`
+
 `cd clintrials`
+
 `git clone https://github.com/brockk/clintrials.git`
+
 `cd tutorials`
+
 Fire up a ipython notebook session for the tutorials using:
+
 `jupyter notebook`
 
 A browser window should leap into life and you should see the tutorials.

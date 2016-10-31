@@ -668,7 +668,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         df['P(Eff)'] = self.prob_eff
         df['P(Tox)'] = self.prob_tox
         df['P(AccEff)'] = self.prob_acc_eff
-        df['P(AccEff)'] = self.prob_acc_tox
+        df['P(AccTox)'] = self.prob_acc_tox
         df['Admissible'] = self.dose_admissability()
         df['Utility'] = self.utility
 

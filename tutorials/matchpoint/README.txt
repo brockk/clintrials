@@ -8,8 +8,8 @@ To load these notebooks, you need ipython.
 We recommended you use the Anaconda distribution of Python because it greatly simplifies the process of installing Python and the common add-ons like numpy, scipy, pandas, etc. 
 
 git clone https://github.com/brockk/clintrials.git
-cd clintrials/tutorials/matchpoint
-jupyter notebook
+cd clintrials
+jupyter notebook --notebook-dir=tutorials/matchpoint
 
 
 

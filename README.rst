@@ -66,17 +66,15 @@ The disadvantage of this method is that you don't get the nice tutorial workbook
 Using git to clone this repo, including tutorial notebooks
 ----
 
-`mkdir clintrials`
-
-`cd clintrials`
+Navigate in terminal or DOS to a directory where you want the code and run
 
 `git clone https://github.com/brockk/clintrials.git`
 
-`cd tutorials`
+`cd clintrials`
 
-Fire up a ipython notebook session for the tutorials using:
+Fire up a jupyter notebook session for the tutorials using:
 
-`jupyter notebook`
+`jupyter notebook --notebook-dir=tutorials`
 
 A browser window should leap into life and you should see the tutorials.
 

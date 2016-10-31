@@ -2,15 +2,13 @@ DTPs.pynb
 Utility.ipynb
 Ambivalence.ipynb
 
-are three tutorials provided to complement the publication "Implementing the EffTox Dose-Finding Design in the Matchpoint Trial" (Brock _et al_.,in submission). Please consult the paper for the clinical background, the methodology details, and full explanation of the terminology.
+are three tutorials provided to complement the publication "Implementing the EffTox Dose-Finding Design in the Matchpoint Trial" (Brock et al.,in submission). Please consult the paper for the clinical background, the methodology details, and full explanation of the terminology.
 
 To load these notebooks, you need ipython. 
 We recommended you use the Anaconda distribution of Python because it greatly simplifies the process of installing Python and the common add-ons like numpy, scipy, pandas, etc. 
 
-mkdir clintrials
-cd clintrials
 git clone https://github.com/brockk/clintrials.git
-cd tutorials/matchpoint
+cd clintrials/tutorials/matchpoint
 jupyter notebook
 
 

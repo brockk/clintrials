@@ -1,13 +1,13 @@
 __author__ = 'Kristian Brock'
 __contact__ = 'kristian.brock@gmail.com'
 
-""" Tests of the crctu.trialdesigns.crm module. """
+""" Tests of the clintrials.dosefindings.crm module. """
 
 from nose.tools import with_setup
 import numpy as np
 from scipy.stats import norm
 
-from clintrials.common import logistic, inverse_logistic
+from clintrials.common import empiric, logistic, inverse_empiric, inverse_logistic
 from clintrials.dosefinding.crm import CRM
 
 
@@ -99,3 +99,34 @@ def test_CRM_mle():
         dose = crm.update([(dose, toxicity)])
 
     # This is all verifiable in R.
+
+
+def test_CRM_bayes_again():
+    prior = [0.1, 0.2, 0.4, 0.6]
+    target = 0.4
+    doses = [1,1,1, 2,2,2]
+    tox   = [0,0,0, 1,0,1]
+    cases = list(zip(doses, tox))
+    trial_plugin_1 = CRM(prior, target, 1, 30, F_func=empiric, inverse_F=inverse_empiric, use_quick_integration=False,
+                         plugin_mean=True)
+    trial_plugin_2 = CRM(prior, target, 1, 30, F_func=empiric, inverse_F=inverse_empiric, use_quick_integration=True,
+                         plugin_mean=True)
+    trial_plugin_3 = CRM(prior, target, 1, 30, F_func=logistic, inverse_F=inverse_logistic, use_quick_integration=False,
+                         plugin_mean=True)
+    trial_plugin_4 = CRM(prior, target, 1, 30, F_func=logistic, inverse_F=inverse_logistic, use_quick_integration=True,
+                         plugin_mean=True)
+    trial_plugin_1.update(cases)
+    trial_plugin_2.update(cases)
+    trial_plugin_3.update(cases)
+    trial_plugin_4.update(cases)
+
+    assert np.all(np.array(trial_plugin_1.prob_tox()) - np.array([[0.240, 0.368, 0.566, 0.728]]) < 0.001)
+    assert np.all(np.array(trial_plugin_2.prob_tox()) - np.array([[0.240, 0.368, 0.566, 0.728]]) < 0.001)
+    assert np.all(np.array(trial_plugin_3.prob_tox()) - np.array([[0.274, 0.412, 0.598, 0.734]]) < 0.001)
+    assert np.all(np.array(trial_plugin_4.prob_tox()) - np.array([[0.274, 0.412, 0.598, 0.734]]) < 0.001)
+    # These are verifiable in R
+
+
+# TODO: tests of full Bayes CRM, verified against bcrm in R
+
+

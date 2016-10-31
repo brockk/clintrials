@@ -13,7 +13,7 @@ import json
 # import pandas as pd
 # from statsmodels.stats.proportion import proportion_confint
 
-from coll import to_1d_list_gen, to_1d_list
+from clintrials.coll import to_1d_list_gen, to_1d_list
 
 
 def fullname(o):

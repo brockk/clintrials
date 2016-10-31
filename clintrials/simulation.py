@@ -40,8 +40,8 @@ def run_sims(sim_func, n1=1, n2=1, out_file=None, **kwargs):
                 with open(out_file, 'w') as outfile:
                     json.dump(sims, outfile)
             except Exception as e:
-                print 'Error writing:', e
-        print j, datetime.now(), len(sims)
+                print('Error writing: %s' % e)
+        print('{} {} {}'.format(j, datetime.now(), len(sims)))
     return sims
 
 
@@ -80,8 +80,8 @@ def sim_parameter_space(sim_func, ps, n1=1, n2=None, out_file=None):
                 with open(out_file, 'w') as outfile:
                     json.dump(sims, outfile)
             except Exception as e:
-                print 'Error writing:', e
-        print j, datetime.now(), len(sims)
+                print('Error writing: %s' % e)
+        print('{} {} {}'.format(j, datetime.now(), len(sims)))
     return sims
 
 
@@ -90,7 +90,11 @@ def _open_json_local(file_loc):
 
 
 def _open_json_url(url):
-    return json.load(urllib2.urlopen(url))
+    try:
+        from urllib2 import urlopen
+    except:
+        from urllib import urlopen
+    return json.load(urlopen(url))
 
 
 def go_fetch_json_sims(file_pattern):
@@ -98,9 +102,9 @@ def go_fetch_json_sims(file_pattern):
     sims = []
     for f in files:
         sub_sims = _open_json_local(f)
-        print f, len(sub_sims)
+        print('{} {}'.format(f, len(sub_sims)))
         sims += sub_sims
-    print 'Fetched', len(sims), 'sims'
+    print('Fetched %s sims' % len(sims))
     return sims
 
 
@@ -288,7 +292,7 @@ def fetch_partition_and_aggregate(f, ps, function_map, verbose=False):
 
     sims = _open_json_local(f)
     if verbose:
-        print 'Fetched {} sims from {}'.format(len(sims), f)
+        print('Fetched {} sims from {}'.format(len(sims), f))
     return partition_and_aggregate(sims, ps, function_map)
 
 

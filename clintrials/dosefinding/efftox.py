@@ -17,7 +17,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from clintrials.common import inverse_logit
-from clintrials.dosefinding import EfficacyToxicityDoseFindingTrial
+from clintrials.dosefinding.efficacytoxicity import EfficacyToxicityDoseFindingTrial
 from clintrials.stats import ProbabilityDensitySample
 from clintrials.util import atomic_to_json, iterable_to_json
 
@@ -114,7 +114,7 @@ def efftox_get_posterior_probs(cases, priors, scaled_doses, tox_cutoff, eff_cuto
     if len(cases) > 0:
         dose_levels, tox_events, eff_events = zip(*cases)
         scaled_doses_given = [scaled_doses[x-1] for x in dose_levels]
-        _cases = zip(scaled_doses_given, tox_events, eff_events)
+        _cases = list(zip(scaled_doses_given, tox_events, eff_events))
     else:
         _cases = []
 
@@ -513,19 +513,31 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
         Params:
         :param real_doses: list of actual doses. E.g. for 10mg and 25mg, use [10, 25].
+        :type real_doses: list
         :param theta_priors: list of prior distributions corresponding to mu_T, beta_T, mu_E, beta1_E, beta2_E, psi
                                 respectively. Each prior object should support obj.ppf(x) and obj.pdf(x)
+        :type theta_priors: list
         :param tox_cutoff: the maximum acceptable probability of toxicity
+        :type tox_cutoff: float
         :param eff_cutoff: the minimium acceptable probability of efficacy
+        :type eff_cutoff: float
         :param tox_certainty: the posterior certainty required that toxicity is less than cutoff
+        :type tox_certainty: float
         :param eff_certainty: the posterior certainty required that efficacy is greater than than cutoff
+        :type eff_certainty: float
         :param metric: instance of LpNormCurve or InverseQuadraticCurve, used to calculate utility
                         of efficacy/toxicity probability pairs.
+        :type metric: LpNormCurve
         :param max_size: maximum number of patients to use
+        :type max_size: int
         :param first_dose: starting dose level, 1-based. I.e. intcpt=3 means the middle dose of 5.
+        :type first_dose: int
         :param avoid_skipping_untried_escalation: True to avoid skipping untried doses in escalation
+        :type avoid_skipping_untried_escalation: bool
         :param avoid_skipping_untried_deescalation: True to avoid skipping untried doses in de-escalation
+        :type avoid_skipping_untried_deescalation: bool
         :param num_integral_steps: number of points to use in Monte Carlo integration.
+        :type num_integral_steps: int
 
         Note: dose_allocation_mode has been suppressed. Remove once I know it is not needed. KB
         # Instances have a dose_allocation_mode property that is set according to this schedule:
@@ -571,7 +583,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         """
         if n is None:
             n = self.num_integral_steps
-        cases = zip(self._doses, self._toxicities, self._efficacies)
+        cases = list(zip(self._doses, self._toxicities, self._efficacies))
         post_probs, _pds = efftox_get_posterior_probs(cases, self.priors, self._scaled_doses, self.tox_cutoff,
                                                      self.eff_cutoff, n)
         prob_tox, prob_eff, prob_acc_tox, prob_acc_eff = zip(*post_probs)
@@ -636,6 +648,31 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
 
     def has_more(self):
         return EfficacyToxicityDoseFindingTrial.has_more(self)
+
+    def tabulate(self):
+        # import pandas as pd
+        # tab_data = OrderedDict()
+        # treated_at_dose = [self.treated_at_dose(d) for d in self.dose_levels()]
+        # eff_at_dose = [self.efficacies_at_dose(d) for d in self.dose_levels()]
+        # tox_at_dose = [self.toxicities_at_dose(d) for d in self.dose_levels()]
+        # tab_data['Dose'] = self.dose_levels()
+        # tab_data['N'] = treated_at_dose
+        # tab_data['Efficacies'] = eff_at_dose
+        # tab_data['Toxicities'] = tox_at_dose
+        # df = pd.DataFrame(tab_data)
+        # df['EffRate'] = np.where(df.N > 0, df.Efficacies / df.N, np.nan)
+        # df['ToxRate'] = np.where(df.N > 0, df.Toxicities / df.N, np.nan)
+
+        df = EfficacyToxicityDoseFindingTrial.tabulate(self)
+
+        df['P(Eff)'] = self.prob_eff
+        df['P(Tox)'] = self.prob_tox
+        df['P(AccEff)'] = self.prob_acc_eff
+        df['P(AccTox)'] = self.prob_acc_tox
+        df['Admissible'] = self.dose_admissability()
+        df['Utility'] = self.utility
+
+        return df
 
     def posterior_params(self, n=None):
         """ Get posterior parameter estimates """

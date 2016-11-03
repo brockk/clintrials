@@ -678,7 +678,7 @@ class EffTox(EfficacyToxicityDoseFindingTrial):
         """ Get posterior parameter estimates """
         if n is None:
             n = self.num_integral_steps
-        cases = zip(self._doses, self._toxicities, self._efficacies)
+        cases = list(zip(self._doses, self._toxicities, self._efficacies))
         post_params, pds = efftox_get_posterior_params(cases, self.priors, self._scaled_doses, n)
         return post_params
 

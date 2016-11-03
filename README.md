@@ -31,7 +31,8 @@ If you have never used Python, I recommend you install Anaconda, a distribution 
 
 ### Dependencies ###
 
-* numpy, scipy, pandas & statsmodels - all of these are installed by Anaconda so I highly recommend that
+* numpy, scipy, pandas & statsmodels - all of these are installed by Anaconda so I highly recommend that.
+Install Anaconda from https://www.continuum.io/downloads
 * Some features also require matplotlib and ggplot. matplotlib also comes with Anaconda but ggplot will require a separate install.
 If you need ggplot, be nice to yourself and use pip:
  `pip install ggplot`
@@ -43,7 +44,8 @@ There are two ways.
 The first method uses pip and the Python package index.
 The extras like the tutorials are not provided.
 The second clones this repo using git.
-Tutorials are provided.
+Tutorials are provided in the tutorials directory.
+The one complication is getting the clinitrials package on your path.
 
 #### Using pip to get just the clintrials code
 To get the latest milestone release, use pip.
@@ -51,7 +53,9 @@ Open up a terminal or DOS session and fire off a:
 
 `pip install clintrials`
 
-The disadvantage of this method is that you don't get the nice tutorial workbooks that illustrate the methods. If you want those, use...
+The advantage of this method is that clintrials is added to your path.
+The disadvantage is that you don't get the nice tutorial workbooks that illustrate the methods. 
+If you want those, use...
 
 #### Using git to clone this repo, including tutorial notebooks
 
@@ -61,11 +65,23 @@ Navigate in terminal or DOS to a directory where you want the code and run
 
 `cd clintrials`
 
-Fire up a jupyter notebook session for the tutorials using:
+You need to put clintrials on your path. 
+An easy way to do this is to edit the PYTHONPATH environment variable.
+To do this in Mac or Linux, run 
+ 
+`export PYTHONPATH=$PYTHONPATH:$(pwd)`
+ 
+Or, in Windows run
+ 
+`set PYTHONPATH=%PYTHONPATH%;%CD%`
+
+Then, load a jupyter notebook session for the tutorials using:
 
 `jupyter notebook --notebook-dir=tutorials`
 
-A browser window should leap into life and you should see the tutorials.
+A browser window should appear and you should see the tutorials.
+Tutorials related to the _Implementing the EffTox Dose-Finding Design in the Matchpoint Trial_ publication
+are in the `matchpoint` directory.
 
 
 ### Documentation

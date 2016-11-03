@@ -6,7 +6,9 @@
 The three tutorials 
 
 DTPs.pynb
+
 Utility.ipynb
+
 Ambivalence.ipynb
 
 are provided to complement the publication _Implementing the EffTox Dose-Finding Design in the Matchpoint Trial_ (Brock et al.,in submission).

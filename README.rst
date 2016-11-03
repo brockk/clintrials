@@ -72,11 +72,23 @@ Navigate in terminal or DOS to a directory where you want the code and run
 
 `cd clintrials`
 
-Fire up a jupyter notebook session for the tutorials using:
+You need to put clintrials on your path.
+An easy way to do this is to edit the PYTHONPATH environment variable.
+To do this in Mac or Linux, run
+
+`export PYTHONPATH=$PYTHONPATH:$(pwd)`
+
+Or, in Windows run
+
+`set PYTHONPATH=%PYTHONPATH%;%CD%`
+
+Then, load a jupyter notebook session for the tutorials using:
 
 `jupyter notebook --notebook-dir=tutorials`
 
-A browser window should leap into life and you should see the tutorials.
+A browser window should appear and you should see the tutorials.
+Tutorials related to the _Implementing the EffTox Dose-Finding Design in the Matchpoint Trial_ publication
+are in the `matchpoint` directory.
 
 Documentation
 ----
